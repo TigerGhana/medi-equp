@@ -100,6 +100,7 @@ function describeError(err){
   }
   if(err.code === '42501' || /row-level security/i.test(err.message||'')) return 'You do not have permission to make this change under your current role/facility assignment.';
   if(err.code === '23505') return 'That record already exists (duplicate value on a unique field).';
+  if(err.code === 'PGRST116' || /coerce the result to a single JSON object/i.test(err.message||'')) return 'That change was not saved — your account does not have permission to update this record.';
   var base = err.message ? err.message : (function(){ try{ return JSON.stringify(err); }catch(e){ return String(err); } })();
   return base;
 }
