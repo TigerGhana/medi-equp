@@ -1088,9 +1088,13 @@ function renderQrTab(e){
 // ---------------------------------------------------------------------
 function openMaintenanceForm(ticket, presetEquipmentId){
   const isNew = !ticket;
-  // Engineers can only update tickets assigned to them (matches maintenance_update
-  // RLS policy) -- show a read-only summary instead of a form they can't save.
-  if(!isNew && isEngineer() && ticket.assignedEngineer !== STATE.session.user.id){
+  // Matches maintenance_update RLS exactly: facility_admin (any ticket at their
+  // facility), the specifically-assigned engineer, or regional_admin (region-wide
+  // oversight). Anyone else -- including Viewers, and Engineers viewing a ticket
+  // that isn't theirs -- gets a read-only summary instead of a form they can't
+  // actually save (which previously surfaced as a confusing PostgREST error).
+  const canManage = isNew || isRegionalAdmin() || isFacilityAdmin() || (isEngineer() && ticket.assignedEngineer === STATE.session.user.id);
+  if(!canManage){
     const e = equipmentById(ticket.equipmentId);
     openModal({
       title: 'Maintenance Ticket', code: `Ticket #${ticket.id.slice(0,8)}`,
@@ -1100,9 +1104,9 @@ function openMaintenanceForm(ticket, presetEquipmentId){
           ${kv('Problem', esc(ticket.problem), true)}
           ${kv('Priority', `<span class="pill ${priorityPillClass(ticket.priority)}">${esc(ticket.priority)}</span>`)}
           ${kv('Status', `<span class="pill ${statusPillClass(ticket.status)}">${esc(ticket.status)}</span>`)}
-          ${kv('Assigned Engineer', esc(userName(ticket.assignedEngineer)))}
+          ${kv('Assigned Engineer', esc(ticket.assignedEngineer ? userName(ticket.assignedEngineer) : 'Unassigned'))}
         </div>
-        <p style="font-size:12.5px; color:var(--muted-2); margin-top:16px;">This ticket is assigned to another engineer, so it's read-only for you.</p>
+        <p style="font-size:12.5px; color:var(--muted-2); margin-top:16px;">You have read-only access to this ticket.</p>
       `
     });
     return;
