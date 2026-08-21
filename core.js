@@ -330,6 +330,20 @@ async function doSignUp(){
     btn.disabled = false; btn.textContent = 'Create account';
   }
 }
+// NOTE: email-based password reset is intentionally disabled here, not
+// just left to fail. This project's Supabase instance doesn't have
+// custom SMTP configured yet, so the built-in email sender is capped at
+// roughly 2 emails/hour project-wide and can't be relied on. Rather than
+// let people click this, wait for an email that may never arrive, and
+// assume the app is broken, we tell them the real (working) path
+// instead: ask an admin, who can reset a password directly via SQL with
+// no email involved (see DEPLOYMENT.md). Once custom SMTP is set up,
+// swap this back to the commented-out real flow below.
+function doForgotPassword(){
+  hideAuthError(); hideAuthInfo();
+  showAuthInfo('Password reset is not self-service yet. Please contact the Clinical Engineering Unit on 0506971001 for the Password Reset');
+}
+/* Real email-based flow -- restore this once custom SMTP is configured:
 async function doForgotPassword(){
   hideAuthError(); hideAuthInfo();
   var email = qs('siEmail').value.trim();
@@ -342,6 +356,7 @@ async function doForgotPassword(){
     showAuthError('Could not send reset email: ' + (err.message||''));
   }
 }
+*/
 async function doSignOut(){
   try{ await sb.auth.signOut(); }catch(e){ console.error(e); }
   if(realtimeChannel){ try{ sb.removeChannel(realtimeChannel); }catch(e){} realtimeChannel = null; }
