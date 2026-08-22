@@ -479,6 +479,16 @@ var ROUTES = [
 ];
 APP.ROUTES = ROUTES;
 
+// External CEU Dashboard forms (separate GitHub Pages app — not part of
+// this SPA's internal router). Each url includes a hash the Dashboard
+// app reads on load to auto-open the right form/tab.
+var EXTERNAL_LINKS = [
+  { url:'https://clinical-engineering-unit.github.io/Dashboard/#fault-reporting',      label:'Fault Reporting',       icon:'fa-triangle-exclamation' },
+  { url:'https://clinical-engineering-unit.github.io/Dashboard/#installation-request', label:'Installation Request',  icon:'fa-toolbox' },
+  { url:'https://clinical-engineering-unit.github.io/Dashboard/#equipment-request',    label:'Equipment Request',     icon:'fa-cart-plus' }
+];
+APP.EXTERNAL_LINKS = EXTERNAL_LINKS;
+
 function renderNav(){
   var role = STATE.profile.role;
   var html = '';
@@ -487,8 +497,14 @@ function renderNav(){
     if(r.hideFor && r.hideFor.indexOf(role) !== -1) return;
     html += '<a data-route="'+r.hash+'"><i class="fa-solid '+r.icon+'"></i>'+esc(r.label)+'</a>';
   });
+  html += '<div class="nav-section">Submit a Request</div>';
+  EXTERNAL_LINKS.forEach(function(l){
+    html += '<a href="'+esc(l.url)+'" data-external="true"><i class="fa-solid '+l.icon+'"></i>'+esc(l.label)+'</a>';
+  });
   qs('navList').innerHTML = html;
-  document.querySelectorAll('#navList a').forEach(function(a){
+  // Only internal routes hijack the click to update location.hash —
+  // external links use their real href and navigate normally.
+  document.querySelectorAll('#navList a[data-route]').forEach(function(a){
     a.addEventListener('click', function(){ location.hash = '#/' + a.getAttribute('data-route'); qs('sidebar').classList.remove('open'); });
   });
 }
