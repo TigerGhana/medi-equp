@@ -55,6 +55,7 @@ var STATE = {
   profile: null,        // row from `users`, camelCase
   regions: [],
   facilities: [],
+  facilityDirectory: [], // id+name only, for all roles — see facility_directory() RPC / RLS note
   categories: [],
   equipment: [],
   maintenance: [],
@@ -416,6 +417,15 @@ async function loadAllData(){
   STATE.users = results[8].data.map(mapUser);
   STATE.regionSettings = results[9].data.map(mapRegionSettings);
   STATE.loaded = true;
+
+  // Separate, resilient fetch: id+name for every facility region-wide,
+  // via an RPC that bypasses per-facility RLS by design. Kept outside
+  // the Promise.all above so an app not yet running the facility_directory()
+  // migration still loads normally instead of failing entirely.
+  try {
+    var dirRes = await sb.rpc('facility_directory');
+    if(!dirRes.error && dirRes.data) STATE.facilityDirectory = dirRes.data;
+  } catch(e) { console.warn('facility_directory RPC not available yet:', e); }
 }
 APP.loadAllData = loadAllData;
 
