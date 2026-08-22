@@ -22,8 +22,8 @@ var CONDITION_OPTIONS = ['FUNCTIONAL','FUNCTIONAL BUT NOT IN USE','NEEDS REPAIR'
 var CAL_STATUS_OPTIONS = ['PASSED CALIBRATION','NOT CALIBRATED','OUT OF CALIBRATION','Not Applicable','Not Specified'];
 var PRIORITY_OPTIONS = ['low','medium','high','critical'];
 var MAINT_STATUS_OPTIONS = ['reported','assigned','repairing','completed','closed'];
-var ROLE_OPTIONS = ['viewer','engineer','facility_admin','regional_director','regional_admin'];
-var ROLE_LABELS = { regional_admin:'Regional Administrator', regional_director:'Regional Director', facility_admin:'Facility Administrator', engineer:'Biomedical Engineer', viewer:'Viewer' };
+var ROLE_OPTIONS = ['viewer','engineer','facility_admin','regional_admin'];
+var ROLE_LABELS = { regional_admin:'Regional Administrator', facility_admin:'Facility Administrator', engineer:'Biomedical Engineer', viewer:'Viewer' };
 var DOC_TYPES = ['Manual','Certificate','Warranty','Photo','Other'];
 
 window.APP = window.APP || {};
@@ -55,6 +55,7 @@ var STATE = {
   profile: null,        // row from `users`, camelCase
   regions: [],
   facilities: [],
+  facilityDirectory: [], // id+name only, for all roles — see facility_directory() RPC / RLS note
   categories: [],
   equipment: [],
   maintenance: [],
@@ -175,7 +176,10 @@ function mapCalibration(r){
 }
 function mapTransfer(r){
   return { id:r.id, equipmentId:r.equipment_id, fromFacility:r.from_facility, toFacility:r.to_facility, requestedBy:r.requested_by,
-    approvedBy:r.approved_by, status:r.status, notes:r.notes, createdAt:r.created_at, updatedAt:r.updated_at };
+    approvedBy:r.approved_by, status:r.status, notes:r.notes, createdAt:r.created_at, updatedAt:r.updated_at,
+    equipmentName:r.equipment_name||null, equipmentAssetCode:r.equipment_asset_code||null,
+    fromFacilityName:r.from_facility_name||null, toFacilityName:r.to_facility_name||null,
+    requestedByName:r.requested_by_name||null };
 }
 function mapDocument(r){
   return { id:r.id, equipmentId:r.equipment_id, fileName:r.file_name, fileUrl:r.file_url, docType:r.doc_type, uploadedBy:r.uploaded_by, createdAt:r.created_at };
@@ -244,21 +248,14 @@ APP.conditionPillClass=conditionPillClass; APP.calPillClass=calPillClass; APP.pr
 // Role / scope helpers
 // ---------------------------------------------------------------------
 function isRegionalAdmin(){ return STATE.profile && STATE.profile.role === 'regional_admin'; }
-function isRegionalDirector(){ return STATE.profile && STATE.profile.role === 'regional_director'; }
 function isFacilityAdmin(){ return STATE.profile && STATE.profile.role === 'facility_admin'; }
 function isEngineer(){ return STATE.profile && STATE.profile.role === 'engineer'; }
-// "Scoped" = sees region-wide data (dashboards, facility lists, cross-facility
-// equipment/maintenance/transfers) -- true for both Regional Administrator and
-// Regional Director. Everything that actually WRITES data stays gated to
-// isRegionalAdmin() alone -- Director is strictly view-only.
-function isRegionalScoped(){ return isRegionalAdmin() || isRegionalDirector(); }
 function canEditEquipment(){ return isFacilityAdmin(); }
 function canEditMaintenance(){ return isFacilityAdmin() || isEngineer(); }
 function canManageUsers(){ return isFacilityAdmin() || isRegionalAdmin(); }
 function canApproveTransfers(){ return isRegionalAdmin(); }
 function canRequestTransfers(){ return isFacilityAdmin(); }
-APP.isRegionalAdmin=isRegionalAdmin; APP.isRegionalDirector=isRegionalDirector; APP.isRegionalScoped=isRegionalScoped;
-APP.isFacilityAdmin=isFacilityAdmin; APP.isEngineer=isEngineer;
+APP.isRegionalAdmin=isRegionalAdmin; APP.isFacilityAdmin=isFacilityAdmin; APP.isEngineer=isEngineer;
 APP.canEditEquipment=canEditEquipment; APP.canEditMaintenance=canEditMaintenance;
 APP.canManageUsers=canManageUsers; APP.canApproveTransfers=canApproveTransfers; APP.canRequestTransfers=canRequestTransfers;
 
@@ -348,7 +345,7 @@ async function doSignUp(){
 // swap this back to the commented-out real flow below.
 function doForgotPassword(){
   hideAuthError(); hideAuthInfo();
-  showAuthInfo('Password resets aren\'t self-service yet. Please contact your Regional or Facility Administrator, and they can reset your password directly.');
+  showAuthInfo('Password reset is not self-service yet. Please contact the Clinical Engineering Unit on 0506971001 for the Password Reset');
 }
 /* Real email-based flow -- restore this once custom SMTP is configured:
 async function doForgotPassword(){
@@ -423,6 +420,15 @@ async function loadAllData(){
   STATE.users = results[8].data.map(mapUser);
   STATE.regionSettings = results[9].data.map(mapRegionSettings);
   STATE.loaded = true;
+
+  // Separate, resilient fetch: id+name for every facility region-wide,
+  // via an RPC that bypasses per-facility RLS by design. Kept outside
+  // the Promise.all above so an app not yet running the facility_directory()
+  // migration still loads normally instead of failing entirely.
+  try {
+    var dirRes = await sb.rpc('facility_directory');
+    if(!dirRes.error && dirRes.data) STATE.facilityDirectory = dirRes.data;
+  } catch(e) { console.warn('facility_directory RPC not available yet:', e); }
 }
 APP.loadAllData = loadAllData;
 
@@ -486,16 +492,32 @@ var ROUTES = [
 ];
 APP.ROUTES = ROUTES;
 
+// External CEU Dashboard forms (separate GitHub Pages app — not part of
+// this SPA's internal router). Each url includes a hash the Dashboard
+// app reads on load to auto-open the right form/tab.
+var EXTERNAL_LINKS = [
+  { url:'https://clinical-engineering-unit.github.io/Dashboard/#fault-reporting',      label:'Fault Reporting',       icon:'fa-triangle-exclamation' },
+  { url:'https://clinical-engineering-unit.github.io/Dashboard/#installation-request', label:'Installation Request',  icon:'fa-toolbox' },
+  { url:'https://clinical-engineering-unit.github.io/Dashboard/#equipment-request',    label:'Equipment Request',     icon:'fa-cart-plus' }
+];
+APP.EXTERNAL_LINKS = EXTERNAL_LINKS;
+
 function renderNav(){
   var role = STATE.profile.role;
   var html = '';
   ROUTES.forEach(function(r){
-    if(r.regionalOnly && role !== 'regional_admin' && role !== 'regional_director') return;
+    if(r.regionalOnly && role !== 'regional_admin') return;
     if(r.hideFor && r.hideFor.indexOf(role) !== -1) return;
     html += '<a data-route="'+r.hash+'"><i class="fa-solid '+r.icon+'"></i>'+esc(r.label)+'</a>';
   });
+  html += '<div class="nav-section">Submit a Request</div>';
+  EXTERNAL_LINKS.forEach(function(l){
+    html += '<a href="'+esc(l.url)+'" data-external="true"><i class="fa-solid '+l.icon+'"></i>'+esc(l.label)+'</a>';
+  });
   qs('navList').innerHTML = html;
-  document.querySelectorAll('#navList a').forEach(function(a){
+  // Only internal routes hijack the click to update location.hash —
+  // external links use their real href and navigate normally.
+  document.querySelectorAll('#navList a[data-route]').forEach(function(a){
     a.addEventListener('click', function(){ location.hash = '#/' + a.getAttribute('data-route'); qs('sidebar').classList.remove('open'); });
   });
 }
@@ -531,7 +553,7 @@ function renderUserBadge(){
   qs('userName').textContent = p.name;
   qs('userRole').textContent = ROLE_LABELS[p.role] || p.role;
   var scopeLabel, scopeValue;
-  if(p.role === 'regional_admin' || p.role === 'regional_director'){
+  if(p.role === 'regional_admin'){
     scopeLabel = 'Region';
     var reg = STATE.regions.find(function(r){ return r.id === p.regionId; });
     scopeValue = reg ? reg.name : 'No region assigned';
