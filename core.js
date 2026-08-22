@@ -176,7 +176,10 @@ function mapCalibration(r){
 }
 function mapTransfer(r){
   return { id:r.id, equipmentId:r.equipment_id, fromFacility:r.from_facility, toFacility:r.to_facility, requestedBy:r.requested_by,
-    approvedBy:r.approved_by, status:r.status, notes:r.notes, createdAt:r.created_at, updatedAt:r.updated_at };
+    approvedBy:r.approved_by, status:r.status, notes:r.notes, createdAt:r.created_at, updatedAt:r.updated_at,
+    equipmentName:r.equipment_name||null, equipmentAssetCode:r.equipment_asset_code||null,
+    fromFacilityName:r.from_facility_name||null, toFacilityName:r.to_facility_name||null,
+    requestedByName:r.requested_by_name||null };
 }
 function mapDocument(r){
   return { id:r.id, equipmentId:r.equipment_id, fileName:r.file_name, fileUrl:r.file_url, docType:r.doc_type, uploadedBy:r.uploaded_by, createdAt:r.created_at };
