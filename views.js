@@ -278,7 +278,15 @@ function renderFacilityDashboardInto(container, f, opts){
 
   container.innerHTML = `
     ${!opts.showBackLink ? renderBannerHero(myEffectiveRegionId(), false) : ''}
-    ${opts.showBackLink ? `<div style="margin-bottom:14px;"><a href="#/facilities" style="font-size:12.5px; color:var(--teal); font-weight:600; cursor:pointer;"><i class="fa-solid fa-arrow-left"></i> Back to all facilities</a></div>` : ''}
+    ${opts.showBackLink ? `
+      <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:14px; flex-wrap:wrap;">
+        <a href="#/facilities" style="font-size:12.5px; color:var(--teal); font-weight:600; cursor:pointer;"><i class="fa-solid fa-arrow-left"></i> Back to all facilities</a>
+        <div style="display:flex; gap:8px;">
+          <button class="btn-secondary btn-sm" id="btnEditFacility"><i class="fa-solid fa-pen"></i> Edit Facility</button>
+          <button class="btn-danger btn-sm" id="btnDeleteFacility"><i class="fa-solid fa-trash"></i> Delete Facility</button>
+        </div>
+      </div>
+    ` : ''}
     <div class="section-head">
       <h2>${esc(f.name)}</h2>
       <span class="hint">${esc(f.facilityType)} · ${esc(dash(f.district))}</span>
@@ -319,6 +327,12 @@ function renderFacilityDashboardInto(container, f, opts){
   renderBarList('facManBar', countBy(eq, e => e.manufacturer), 8);
   const attnBody = qs('facAttnBody');
   if(attnBody) attnBody.querySelectorAll('tr[data-id]').forEach(tr => tr.addEventListener('click', () => { location.hash = '#/equipment/' + tr.getAttribute('data-id'); }));
+  if(opts.showBackLink){
+    const editBtn = qs('btnEditFacility');
+    const delBtn = qs('btnDeleteFacility');
+    if(editBtn) editBtn.addEventListener('click', () => openFacilityForm(f));
+    if(delBtn) delBtn.addEventListener('click', () => confirmDeleteFacility(f));
+  }
 }
 
 function attentionReason(rec){
@@ -377,47 +391,107 @@ function renderFacilitiesList(){
     }).join('');
     grid.querySelectorAll('.facility-card').forEach(c => c.addEventListener('click', () => { location.hash = '#/facilities/' + c.getAttribute('data-fid'); }));
   }
-  qs('btnAddFacility').addEventListener('click', openFacilityForm);
+  qs('btnAddFacility').addEventListener('click', () => openFacilityForm());
 }
 
-function openFacilityForm(){
+function openFacilityForm(existing){
+  const isEdit = !!existing;
+  const f = existing || { name:'', facilityType:'Hospital', district:'', address:'', contact:'' };
+  const typeOptions = ['Teaching Hospital','Regional Hospital','Municipal Hospital','District Hospital','Polyclinic','Health Centre','CHPS','Medical Centre','Private Hospital','CHAG','Quasi-Government','Clinic','Others'];
+  // A facility saved before this list existed (or a custom "Others" entry) may hold
+  // a type that isn't one of these options -- fall back to "Others" with the real
+  // value shown in the text field below, rather than silently losing/blanking it.
+  const knownType = typeOptions.includes(f.facilityType) && f.facilityType !== 'Others';
+  const initialSelect = knownType ? f.facilityType : 'Others';
+  const initialOtherText = knownType ? '' : (f.facilityType || '');
   const body = `
     <div class="form-grid">
-      <div class="form-field span2"><label>Facility Name *</label><input type="text" id="ff_name"></div>
+      <div class="form-field span2"><label>Facility Name *</label><input type="text" id="ff_name" value="${esc(f.name)}"></div>
       <div class="form-field"><label>Facility Type</label>
-        <select id="ff_type"><option>Hospital</option><option>Laboratory</option><option>Clinic</option><option>Health Centre</option></select>
+        <select id="ff_type">${typeOptions.map(t => `<option ${t===initialSelect?'selected':''}>${t}</option>`).join('')}</select>
       </div>
-      <div class="form-field"><label>District</label><input type="text" id="ff_district"></div>
-      <div class="form-field span2"><label>Address</label><input type="text" id="ff_address"></div>
-      <div class="form-field span2"><label>Contact</label><input type="text" id="ff_contact"></div>
+      <div class="form-field" id="ff_type_other_wrap" style="${initialSelect==='Others'?'':'display:none;'}">
+        <label>Specify Type *</label><input type="text" id="ff_type_other" value="${esc(initialOtherText)}" placeholder="e.g. Diagnostic Centre">
+      </div>
+      <div class="form-field"><label>District</label><input type="text" id="ff_district" value="${esc(f.district||'')}"></div>
+      <div class="form-field span2"><label>Address</label><input type="text" id="ff_address" value="${esc(f.address||'')}"></div>
+      <div class="form-field span2"><label>Contact</label><input type="text" id="ff_contact" value="${esc(f.contact||'')}"></div>
     </div>
     <div class="field-error" id="ff_error"></div>
     <div class="modal-actions"><div class="left"></div><div class="right">
       <button class="btn-secondary" id="ff_cancel">Cancel</button>
-      <button class="btn-primary" id="ff_save" style="width:auto;">Add Facility</button>
+      <button class="btn-primary" id="ff_save" style="width:auto;">${isEdit ? 'Save Changes' : 'Add Facility'}</button>
     </div></div>
   `;
-  openModal({ title:'Add Facility', code:'New facility record', bodyHtml: body });
+  openModal({ title: isEdit ? `Edit Facility: ${f.name}` : 'Add Facility', code: isEdit ? 'Update facility details' : 'New facility record', bodyHtml: body });
   qs('ff_cancel').addEventListener('click', closeModal);
+  qs('ff_type').addEventListener('change', e => {
+    qs('ff_type_other_wrap').style.display = e.target.value === 'Others' ? '' : 'none';
+  });
   qs('ff_save').addEventListener('click', async () => {
     const errEl = qs('ff_error'); errEl.classList.remove('show');
     const name = qs('ff_name').value.trim();
     if(!name){ errEl.textContent = 'Facility name is required.'; errEl.classList.add('show'); return; }
+    const selectedType = qs('ff_type').value;
+    const otherText = qs('ff_type_other').value.trim();
+    if(selectedType === 'Others' && !otherText){ errEl.textContent = 'Please specify the facility type.'; errEl.classList.add('show'); return; }
+    const finalType = selectedType === 'Others' ? otherText : selectedType;
     const btn = qs('ff_save'); btn.disabled = true; btn.textContent = 'Saving…';
     try{
       const row = APP.toDbFacility({
         regionId: STATE.profile.regionId, name,
-        facilityType: qs('ff_type').value, district: qs('ff_district').value.trim(),
+        facilityType: finalType, district: qs('ff_district').value.trim(),
         address: qs('ff_address').value.trim(), contact: qs('ff_contact').value.trim()
       });
-      const res = await sb.from('facilities').insert(row).select().single();
+      let res;
+      if(isEdit) res = await sb.from('facilities').update(row).eq('id', f.id).select().single();
+      else res = await sb.from('facilities').insert(row).select().single();
       if(res.error) throw res.error;
-      STATE.facilities.push(APP.mapFacility(res.data));
-      closeModal(); showInfo('Facility added.'); rerenderCurrent();
+      const mapped = APP.mapFacility(res.data);
+      const idx = STATE.facilities.findIndex(x => x.id === mapped.id);
+      if(idx !== -1) STATE.facilities[idx] = mapped; else STATE.facilities.push(mapped);
+      closeModal(); showInfo(isEdit ? 'Facility updated.' : 'Facility added.'); rerenderCurrent();
     }catch(err){
       errEl.textContent = 'Save failed: ' + describeError(err); errEl.classList.add('show');
-    }finally{ btn.disabled = false; btn.textContent = 'Add Facility'; }
+    }finally{ btn.disabled = false; btn.textContent = isEdit ? 'Save Changes' : 'Add Facility'; }
   });
+}
+
+function confirmDeleteFacility(f){
+  const equipmentCount = STATE.equipment.filter(e => e.facilityId === f.id).length;
+  if(equipmentCount > 0){
+    openModal({
+      title: 'Cannot Delete Facility', code: f.name,
+      bodyHtml: `
+        <div class="modal-alert">⚠ <div>
+          <strong>${f.name}</strong> still has <strong>${equipmentCount} equipment record${equipmentCount===1?'':'s'}</strong> registered to it.
+          Deleting a facility permanently deletes every piece of equipment assigned to it — along with all of that
+          equipment's maintenance history, calibration records, and documents. There is no way to undo this.
+        </div></div>
+        <p style="font-size:13px; color:var(--muted); margin:0;">
+          To delete this facility, first <a href="#/equipment" style="color:var(--teal); font-weight:600;">transfer or remove all its equipment</a>, then come back and try again.
+        </p>
+        <div class="modal-actions"><div class="left"></div><div class="right"><button class="btn-primary" id="fd_ok" style="width:auto;">Got it</button></div></div>
+      `
+    });
+    qs('fd_ok').addEventListener('click', closeModal);
+    return;
+  }
+  const confirmed = window.confirm(
+    `Delete "${f.name}"? This facility has no equipment on record, but this will also permanently remove any staff assignments and transfer history tied to it. This cannot be undone.\n\nType nothing needed — click OK to confirm, or Cancel to stop.`
+  );
+  if(!confirmed) return;
+  (async () => {
+    try{
+      const res = await sb.from('facilities').delete().eq('id', f.id);
+      if(res.error) throw res.error;
+      STATE.facilities = STATE.facilities.filter(x => x.id !== f.id);
+      showInfo('Facility deleted.');
+      location.hash = '#/facilities';
+    }catch(err){
+      showError('Delete failed: ' + describeError(err));
+    }
+  })();
 }
 
 // =====================================================================
