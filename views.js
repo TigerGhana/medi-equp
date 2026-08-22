@@ -1373,7 +1373,14 @@ function renderTransfers(){
 
 function openTransferForm(presetEquipment){
   const myEquipment = STATE.equipment.filter(e => e.facilityId === STATE.profile.facilityId);
-  const otherFacilities = STATE.facilities.filter(f => f.id !== STATE.profile.facilityId);
+  // STATE.facilities can be restricted by RLS to just this user's own
+  // facility for facility_admin accounts. When that leaves no other
+  // facility to pick from, fall back to the id+name-only directory
+  // (STATE.facilityDirectory) which every signed-in role can read.
+  let otherFacilities = STATE.facilities.filter(f => f.id !== STATE.profile.facilityId);
+  if(otherFacilities.length === 0 && STATE.facilityDirectory.length > 0){
+    otherFacilities = STATE.facilityDirectory.filter(f => f.id !== STATE.profile.facilityId);
+  }
   const body = `
     <div class="form-grid">
       <div class="form-field span2"><label>Equipment *</label>
