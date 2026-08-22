@@ -91,7 +91,7 @@ function computeFacilityMetrics(facilityId){
 // REGION BANNER (dashboard header image, regional_admin can upload/change)
 // =====================================================================
 function myEffectiveRegionId(){
-  if(isRegionalScoped()) return STATE.profile.regionId;
+  if(isRegionalAdmin()) return STATE.profile.regionId;
   const f = facilityById(STATE.profile.facilityId);
   return f ? f.regionId : null;
 }
@@ -153,7 +153,7 @@ async function bannerUploadFlow(regionId, e){
 }
 
 function renderDashboard(){
-  if(isRegionalScoped()) renderRegionalDashboard();
+  if(isRegionalAdmin()) renderRegionalDashboard();
   else renderSingleFacilityDashboard(STATE.profile.facilityId);
 }
 
@@ -184,7 +184,7 @@ function renderRegionalDashboard(){
   }).sort((a,b) => a.m.pct - b.m.pct);
 
   mainEl().innerHTML = `
-    ${renderBannerHero(STATE.profile.regionId, isRegionalAdmin())}
+    ${renderBannerHero(STATE.profile.regionId, true)}
     <div class="kpi-grid">${kpis.map(k => `
       <div class="kpi-card"><div class="lbl"><i class="fa-solid ${k.icon}"></i> ${esc(k.label)}</div><div class="val ${k.cls}">${k.value}</div></div>
     `).join('')}</div>
@@ -242,7 +242,7 @@ function renderRegionalDashboard(){
   });
   renderBarList('regionManBar', countBy(eq, e => e.manufacturer), 8);
   renderBarList('regionFacBar', countBy(eq, e => facilityName(e.facilityId)), 8);
-  wireBannerHero(STATE.profile.regionId, isRegionalAdmin());
+  wireBannerHero(STATE.profile.regionId, true);
 }
 
 function renderSingleFacilityDashboard(facilityId){
@@ -259,7 +259,7 @@ function renderFacilityDashboard(facilityId){
   const f = facilityById(facilityId);
   if(!f){ mainEl().innerHTML = `<div class="empty-state"><i class="fa-solid fa-hospital"></i><p>Facility not found or you don't have access to it.</p></div>`; return; }
   setPageTitle(f.name);
-  renderFacilityDashboardInto(mainEl(), f, { showBackLink: isRegionalScoped(), canManageFacility: isRegionalAdmin() });
+  renderFacilityDashboardInto(mainEl(), f, { showBackLink: isRegionalAdmin() });
 }
 
 function renderFacilityDashboardInto(container, f, opts){
@@ -281,12 +281,10 @@ function renderFacilityDashboardInto(container, f, opts){
     ${opts.showBackLink ? `
       <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:14px; flex-wrap:wrap;">
         <a href="#/facilities" style="font-size:12.5px; color:var(--teal); font-weight:600; cursor:pointer;"><i class="fa-solid fa-arrow-left"></i> Back to all facilities</a>
-        ${opts.canManageFacility ? `
         <div style="display:flex; gap:8px;">
           <button class="btn-secondary btn-sm" id="btnEditFacility"><i class="fa-solid fa-pen"></i> Edit Facility</button>
           <button class="btn-danger btn-sm" id="btnDeleteFacility"><i class="fa-solid fa-trash"></i> Delete Facility</button>
         </div>
-        ` : ''}
       </div>
     ` : ''}
     <div class="section-head">
@@ -329,7 +327,7 @@ function renderFacilityDashboardInto(container, f, opts){
   renderBarList('facManBar', countBy(eq, e => e.manufacturer), 8);
   const attnBody = qs('facAttnBody');
   if(attnBody) attnBody.querySelectorAll('tr[data-id]').forEach(tr => tr.addEventListener('click', () => { location.hash = '#/equipment/' + tr.getAttribute('data-id'); }));
-  if(opts.canManageFacility){
+  if(opts.showBackLink){
     const editBtn = qs('btnEditFacility');
     const delBtn = qs('btnDeleteFacility');
     if(editBtn) editBtn.addEventListener('click', () => openFacilityForm(f));
@@ -372,7 +370,7 @@ function renderFacilitiesList(){
       <span class="hint">${STATE.facilities.length} facilities</span>
     </div>
     <div class="controls">
-      ${isRegionalAdmin() ? `<button class="btn-add" id="btnAddFacility"><i class="fa-solid fa-plus"></i> Add Facility</button>` : ''}
+      <button class="btn-add" id="btnAddFacility"><i class="fa-solid fa-plus"></i> Add Facility</button>
     </div>
     <div id="facilityGrid" style="display:grid; grid-template-columns:repeat(auto-fill,minmax(260px,1fr)); gap:14px;"></div>
   `;
@@ -393,8 +391,7 @@ function renderFacilitiesList(){
     }).join('');
     grid.querySelectorAll('.facility-card').forEach(c => c.addEventListener('click', () => { location.hash = '#/facilities/' + c.getAttribute('data-fid'); }));
   }
-  const addBtn = qs('btnAddFacility');
-  if(addBtn) addBtn.addEventListener('click', () => openFacilityForm());
+  qs('btnAddFacility').addEventListener('click', () => openFacilityForm());
 }
 
 function openFacilityForm(existing){
@@ -505,7 +502,7 @@ let eqSort = { key:'name', dir:1 };
 
 function renderEquipmentList(){
   setPageTitle('Equipment Inventory');
-  const showFacilityCol = isRegionalScoped();
+  const showFacilityCol = isRegionalAdmin();
   mainEl().innerHTML = `
     <div class="section-head">
       <h2>Full Equipment Register</h2>
@@ -588,7 +585,7 @@ function getFilteredEquipment(){
   });
 }
 function renderEquipmentTableBody(){
-  const showFacilityCol = isRegionalScoped();
+  const showFacilityCol = isRegionalAdmin();
   let rows = getFilteredEquipment();
   rows = rows.slice().sort((a,b) => {
     if(eqSort.key === 'critical') return (criticalScore(a) - criticalScore(b)) * eqSort.dir;
@@ -1288,7 +1285,7 @@ function openCalibrationForm(equipmentId){
 // =====================================================================
 function renderMaintenance(){
   setPageTitle('Maintenance Management');
-  const scoped = isRegionalScoped() ? STATE.maintenance : STATE.maintenance.filter(m => { const e = equipmentById(m.equipmentId); return e && e.facilityId === STATE.profile.facilityId; });
+  const scoped = isRegionalAdmin() ? STATE.maintenance : STATE.maintenance.filter(m => { const e = equipmentById(m.equipmentId); return e && e.facilityId === STATE.profile.facilityId; });
   const myTickets = isEngineer() ? scoped.filter(m => m.assignedEngineer === STATE.session.user.id) : scoped;
 
   const open = myTickets.filter(m => ['reported','assigned','repairing'].includes(m.status)).length;
@@ -1357,13 +1354,18 @@ function renderTransfers(){
   if(rows.length === 0){ tbody.innerHTML = `<tr><td colspan="7"><div class="no-results">No transfer requests yet.</div></td></tr>`; return; }
   tbody.innerHTML = rows.map(t => {
     const e = equipmentById(t.equipmentId);
+    const eqName = t.equipmentName || (e ? e.name : 'Unknown');
+    const eqCode = t.equipmentAssetCode || (e ? e.assetCode : null);
+    const fromName = t.fromFacilityName || facilityName(t.fromFacility);
+    const toName = t.toFacilityName || facilityName(t.toFacility);
+    const reqName = t.requestedByName || userName(t.requestedBy);
     const canApprove = canApproveTransfers() && t.status === 'pending';
     const canReceive = isFacilityAdmin() && t.status === 'approved' && t.toFacility === STATE.profile.facilityId;
     return `<tr>
-      <td data-label="Equipment" class="name-cell">${esc(e ? e.name : 'Unknown')}${e ? `<div class="mono" style="font-size:11px;color:var(--muted-2);">${esc(dash(e.assetCode))}</div>` : ''}</td>
-      <td data-label="From">${esc(facilityName(t.fromFacility))}</td>
-      <td data-label="To">${esc(facilityName(t.toFacility))}</td>
-      <td data-label="Requested By">${esc(userName(t.requestedBy))}</td>
+      <td data-label="Equipment" class="name-cell">${esc(eqName)}${eqCode ? `<div class="mono" style="font-size:11px;color:var(--muted-2);">${esc(dash(eqCode))}</div>` : ''}</td>
+      <td data-label="From">${esc(fromName)}</td>
+      <td data-label="To">${esc(toName)}</td>
+      <td data-label="Requested By">${esc(reqName)}</td>
       <td data-label="Status"><span class="pill ${statusPillClass(t.status)}">${esc(t.status)}</span></td>
       <td data-label="Date" class="mono">${fmtDate(t.createdAt.slice(0,10))}</td>
       <td data-label="Action">${canApprove ? `<button class="btn-secondary btn-sm approve-t" data-id="${t.id}" style="color:var(--ok); border-color:var(--ok);">Approve</button> <button class="btn-secondary btn-sm reject-t" data-id="${t.id}" style="color:var(--bad); border-color:var(--bad);">Reject</button>` : (canReceive ? `<button class="btn-secondary btn-sm receive-t" data-id="${t.id}">Mark Received</button>` : '—')}</td>
@@ -1376,7 +1378,14 @@ function renderTransfers(){
 
 function openTransferForm(presetEquipment){
   const myEquipment = STATE.equipment.filter(e => e.facilityId === STATE.profile.facilityId);
-  const otherFacilities = STATE.facilities.filter(f => f.id !== STATE.profile.facilityId);
+  // STATE.facilities can be restricted by RLS to just this user's own
+  // facility for facility_admin accounts. When that leaves no other
+  // facility to pick from, fall back to the id+name-only directory
+  // (STATE.facilityDirectory) which every signed-in role can read.
+  let otherFacilities = STATE.facilities.filter(f => f.id !== STATE.profile.facilityId);
+  if(otherFacilities.length === 0 && STATE.facilityDirectory.length > 0){
+    otherFacilities = STATE.facilityDirectory.filter(f => f.id !== STATE.profile.facilityId);
+  }
   const body = `
     <div class="form-grid">
       <div class="form-field span2"><label>Equipment *</label>
@@ -1406,7 +1415,23 @@ function openTransferForm(presetEquipment){
     if(!toFacility){ errEl.textContent = 'Select a destination facility.'; errEl.classList.add('show'); return; }
     const btn = qs('tf_save'); btn.disabled = true; btn.textContent = 'Submitting…';
     try{
-      const row = { equipment_id: equipmentId, from_facility: STATE.profile.facilityId, to_facility: toFacility, requested_by: STATE.session.user.id, notes: qs('tf_notes').value.trim()||null, status:'pending' };
+      // Snapshot human-readable details now, while the requester still has
+      // full visibility into their own equipment/facility/profile. This
+      // keeps the transfer record self-contained and readable by both
+      // sides later, even after RLS would otherwise hide the equipment
+      // (it moves to the destination facility once approved) or the other
+      // facility's/user's details.
+      const eqRecord = myEquipment.find(e => e.id === equipmentId) || (presetEquipment && presetEquipment.id === equipmentId ? presetEquipment : null);
+      const toFacilityRecord = otherFacilities.find(f => f.id === toFacility);
+      const row = {
+        equipment_id: equipmentId, from_facility: STATE.profile.facilityId, to_facility: toFacility,
+        requested_by: STATE.session.user.id, notes: qs('tf_notes').value.trim()||null, status:'pending',
+        equipment_name: eqRecord ? eqRecord.name : null,
+        equipment_asset_code: eqRecord ? eqRecord.assetCode : null,
+        from_facility_name: (facilityById(STATE.profile.facilityId) || {}).name || null,
+        to_facility_name: toFacilityRecord ? toFacilityRecord.name : null,
+        requested_by_name: STATE.profile.name || null
+      };
       const res = await sb.from('transfers').insert(row).select().single();
       if(res.error) throw res.error;
       STATE.transfers.push(APP.mapTransfer(res.data));
@@ -1456,7 +1481,7 @@ function renderReports(){
         <p style="font-size:12.5px; color:var(--muted); margin:0 0 14px;">Repair frequency, average cost and downtime per equipment.</p>
         <div style="display:flex; gap:8px;"><button class="btn-secondary" id="repMaintCsv"><i class="fa-solid fa-file-arrow-down"></i> Export</button><button class="btn-secondary" id="repMaintPrint"><i class="fa-solid fa-print"></i> Print</button></div>
       </div>
-      ${isRegionalScoped() ? `
+      ${isRegionalAdmin() ? `
       <div class="panel">
         <h3>Regional Facility Comparison</h3>
         <p style="font-size:12.5px; color:var(--muted); margin:0 0 14px;">Availability and critical shortages across every facility in the region.</p>
@@ -1569,7 +1594,7 @@ function renderUsers(){
       <td data-label="Role"><span class="pill info">${esc(ROLE_LABELS[u.role]||u.role)}</span></td>
       <td data-label="Facility">${esc(u.facilityId ? facilityName(u.facilityId) : '—')}</td>
       <td data-label="Status"><span class="pill ${u.isActive ? 'ok':'neutral'}">${u.isActive?'Active':'Inactive'}</span></td>
-      <td data-label="Action">${canManageUsers() ? `<button class="btn-secondary btn-sm edit-user" data-id="${u.id}">Edit</button>` : '—'}</td>
+      <td data-label="Action"><button class="btn-secondary btn-sm edit-user" data-id="${u.id}">Edit</button></td>
     </tr>`).join('');
   document.querySelectorAll('.edit-user').forEach(b => b.addEventListener('click', () => openUserForm(STATE.users.find(u => u.id === b.getAttribute('data-id')))));
 }
@@ -1597,16 +1622,15 @@ function openUserForm(u){
     const errEl = qs('uf_error'); errEl.classList.remove('show');
     const role = qs('uf_role').value;
     const facilityId = qs('uf_facility').value || null;
-    const isRegionScopedRole = role === 'regional_admin' || role === 'regional_director';
-    if(!isRegionScopedRole && !facilityId){
-      errEl.textContent = 'Select a facility — every role except Regional Administrator and Regional Director must belong to one.';
+    if(role !== 'regional_admin' && !facilityId){
+      errEl.textContent = 'Select a facility — every role except Regional Administrator must belong to one.';
       errEl.classList.add('show');
       return;
     }
     const btn = qs('uf_save'); btn.disabled = true; btn.textContent = 'Saving…';
     try{
-      const row = { role, facility_id: isRegionScopedRole ? null : facilityId, is_active: qs('uf_active').value === 'true' };
-      row.region_id = isRegionScopedRole ? STATE.profile.regionId : null;
+      const row = { role, facility_id: role === 'regional_admin' ? null : facilityId, is_active: qs('uf_active').value === 'true' };
+      row.region_id = role === 'regional_admin' ? STATE.profile.regionId : null;
       const res = await sb.from('users').update(row).eq('id', u.id).select().single();
       if(res.error) throw res.error;
       const idx = STATE.users.findIndex(x => x.id === u.id);
@@ -1631,7 +1655,7 @@ function renderSettings(){
           <div class="form-field span2"><label>Full Name</label><input type="text" id="st_name" value="${esc(p.name)}"></div>
           <div class="form-field"><label>Email</label><input type="text" value="${esc(p.email)}" disabled></div>
           <div class="form-field"><label>Role</label><input type="text" value="${esc(ROLE_LABELS[p.role]||p.role)}" disabled></div>
-          <div class="form-field span2"><label>${(p.role==='regional_admin'||p.role==='regional_director')?'Region':'Facility'}</label><input type="text" value="${esc((p.role==='regional_admin'||p.role==='regional_director') ? (STATE.regions.find(r=>r.id===p.regionId)||{}).name||'Not assigned' : (p.facilityId?facilityName(p.facilityId):'Not assigned'))}" disabled></div>
+          <div class="form-field span2"><label>${p.role==='regional_admin'?'Region':'Facility'}</label><input type="text" value="${esc(p.role==='regional_admin' ? (STATE.regions.find(r=>r.id===p.regionId)||{}).name||'Not assigned' : (p.facilityId?facilityName(p.facilityId):'Not assigned'))}" disabled></div>
         </div>
         <div class="field-error" id="st_error"></div>
         <div class="modal-actions" style="border-top:none; padding-top:0; justify-content:flex-end;"><button class="btn-primary" id="st_save" style="width:auto;">Save Profile</button></div>
