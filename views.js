@@ -1354,13 +1354,18 @@ function renderTransfers(){
   if(rows.length === 0){ tbody.innerHTML = `<tr><td colspan="7"><div class="no-results">No transfer requests yet.</div></td></tr>`; return; }
   tbody.innerHTML = rows.map(t => {
     const e = equipmentById(t.equipmentId);
+    const eqName = t.equipmentName || (e ? e.name : 'Unknown');
+    const eqCode = t.equipmentAssetCode || (e ? e.assetCode : null);
+    const fromName = t.fromFacilityName || facilityName(t.fromFacility);
+    const toName = t.toFacilityName || facilityName(t.toFacility);
+    const reqName = t.requestedByName || userName(t.requestedBy);
     const canApprove = canApproveTransfers() && t.status === 'pending';
     const canReceive = isFacilityAdmin() && t.status === 'approved' && t.toFacility === STATE.profile.facilityId;
     return `<tr>
-      <td data-label="Equipment" class="name-cell">${esc(e ? e.name : 'Unknown')}${e ? `<div class="mono" style="font-size:11px;color:var(--muted-2);">${esc(dash(e.assetCode))}</div>` : ''}</td>
-      <td data-label="From">${esc(facilityName(t.fromFacility))}</td>
-      <td data-label="To">${esc(facilityName(t.toFacility))}</td>
-      <td data-label="Requested By">${esc(userName(t.requestedBy))}</td>
+      <td data-label="Equipment" class="name-cell">${esc(eqName)}${eqCode ? `<div class="mono" style="font-size:11px;color:var(--muted-2);">${esc(dash(eqCode))}</div>` : ''}</td>
+      <td data-label="From">${esc(fromName)}</td>
+      <td data-label="To">${esc(toName)}</td>
+      <td data-label="Requested By">${esc(reqName)}</td>
       <td data-label="Status"><span class="pill ${statusPillClass(t.status)}">${esc(t.status)}</span></td>
       <td data-label="Date" class="mono">${fmtDate(t.createdAt.slice(0,10))}</td>
       <td data-label="Action">${canApprove ? `<button class="btn-secondary btn-sm approve-t" data-id="${t.id}" style="color:var(--ok); border-color:var(--ok);">Approve</button> <button class="btn-secondary btn-sm reject-t" data-id="${t.id}" style="color:var(--bad); border-color:var(--bad);">Reject</button>` : (canReceive ? `<button class="btn-secondary btn-sm receive-t" data-id="${t.id}">Mark Received</button>` : '—')}</td>
@@ -1410,7 +1415,23 @@ function openTransferForm(presetEquipment){
     if(!toFacility){ errEl.textContent = 'Select a destination facility.'; errEl.classList.add('show'); return; }
     const btn = qs('tf_save'); btn.disabled = true; btn.textContent = 'Submitting…';
     try{
-      const row = { equipment_id: equipmentId, from_facility: STATE.profile.facilityId, to_facility: toFacility, requested_by: STATE.session.user.id, notes: qs('tf_notes').value.trim()||null, status:'pending' };
+      // Snapshot human-readable details now, while the requester still has
+      // full visibility into their own equipment/facility/profile. This
+      // keeps the transfer record self-contained and readable by both
+      // sides later, even after RLS would otherwise hide the equipment
+      // (it moves to the destination facility once approved) or the other
+      // facility's/user's details.
+      const eqRecord = myEquipment.find(e => e.id === equipmentId) || (presetEquipment && presetEquipment.id === equipmentId ? presetEquipment : null);
+      const toFacilityRecord = otherFacilities.find(f => f.id === toFacility);
+      const row = {
+        equipment_id: equipmentId, from_facility: STATE.profile.facilityId, to_facility: toFacility,
+        requested_by: STATE.session.user.id, notes: qs('tf_notes').value.trim()||null, status:'pending',
+        equipment_name: eqRecord ? eqRecord.name : null,
+        equipment_asset_code: eqRecord ? eqRecord.assetCode : null,
+        from_facility_name: (facilityById(STATE.profile.facilityId) || {}).name || null,
+        to_facility_name: toFacilityRecord ? toFacilityRecord.name : null,
+        requested_by_name: STATE.profile.name || null
+      };
       const res = await sb.from('transfers').insert(row).select().single();
       if(res.error) throw res.error;
       STATE.transfers.push(APP.mapTransfer(res.data));
