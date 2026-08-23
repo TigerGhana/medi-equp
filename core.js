@@ -476,6 +476,7 @@ function applyRealtime(table, mapper, payload){
 // =====================================================================
 var ROUTES = [
   { hash:'dashboard', label:'Dashboard', icon:'fa-gauge-high', crumb:'Overview' },
+  { hash:'help', label:'Help Guide', icon:'fa-circle-question', crumb:'Getting Started' },
   { hash:'facilities', label:'Facilities', icon:'fa-hospital', crumb:'Regional', regionalOnly:true },
   { hash:'equipment', label:'Equipment', icon:'fa-kit-medical', crumb:'Inventory' },
   { hash:'maintenance', label:'Maintenance', icon:'fa-screwdriver-wrench', crumb:'Workflow' },
