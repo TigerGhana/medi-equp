@@ -486,6 +486,19 @@ var ROUTES = [
 ];
 APP.ROUTES = ROUTES;
 
+// External links to the public CEU Dashboard (a separate site — no login of
+// its own, but only reachable from inside this app once signed in, since the
+// sidebar that holds these links only renders after boot()/authentication).
+// Each URL includes that site's own tab anchor (confirmed against its real
+// deep-link behavior, not guessed) so each item opens directly on the right
+// form instead of always landing on its default tab.
+var EXTERNAL_LINKS = [
+  { label:'Fault Reporting', icon:'fa-triangle-exclamation', url:'https://clinical-engineering-unit.github.io/Dashboard/#fault' },
+  { label:'Installation Request', icon:'fa-screwdriver-wrench', url:'https://clinical-engineering-unit.github.io/Dashboard/#install' },
+  { label:'Equipment Request', icon:'fa-kit-medical', url:'https://clinical-engineering-unit.github.io/Dashboard/#equip' }
+];
+APP.EXTERNAL_LINKS = EXTERNAL_LINKS;
+
 function renderNav(){
   var role = STATE.profile.role;
   var html = '';
@@ -494,8 +507,12 @@ function renderNav(){
     if(r.hideFor && r.hideFor.indexOf(role) !== -1) return;
     html += '<a data-route="'+r.hash+'"><i class="fa-solid '+r.icon+'"></i>'+esc(r.label)+'</a>';
   });
+  html += '<div class="nav-section">CEU Dashboard</div>';
+  EXTERNAL_LINKS.forEach(function(r){
+    html += '<a href="'+esc(r.url)+'" target="_blank" rel="noopener noreferrer"><i class="fa-solid '+r.icon+'"></i>'+esc(r.label)+'<i class="fa-solid fa-arrow-up-right-from-square" style="margin-left:auto; font-size:10px; opacity:.6;"></i></a>';
+  });
   qs('navList').innerHTML = html;
-  document.querySelectorAll('#navList a').forEach(function(a){
+  document.querySelectorAll('#navList a[data-route]').forEach(function(a){
     a.addEventListener('click', function(){ location.hash = '#/' + a.getAttribute('data-route'); qs('sidebar').classList.remove('open'); });
   });
 }
