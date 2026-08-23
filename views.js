@@ -58,6 +58,7 @@ function render(name, param){
   currentView = { name, param };
   try{
     if(name === 'dashboard') renderDashboard();
+    else if(name === 'help') renderHelp();
     else if(name === 'facilities') param ? renderFacilityDashboard(param) : renderFacilitiesList();
     else if(name === 'equipment') param ? renderEquipmentDetail(param) : renderEquipmentList();
     else if(name === 'maintenance') renderMaintenance();
@@ -1620,6 +1621,146 @@ function openUserForm(u){
 // =====================================================================
 // SETTINGS
 // =====================================================================
+// =====================================================================
+// HELP GUIDE
+// =====================================================================
+var helpTab = 'start';
+var ROLE_SUMMARIES = [
+  { role:'regional_admin', title:'Regional Administrator', icon:'fa-user-shield', pill:'ok',
+    blurb:'Full oversight and control across every facility in the region.',
+    can:['View every facility, all equipment, maintenance, transfers, and reports region-wide','Add, edit, and delete facilities','Approve or reject equipment transfer requests between facilities','Add, edit, and deactivate any user — including promoting Facility Administrators and Regional Directors','Upload the region banner image shown on the dashboard','Update maintenance tickets across any facility'],
+    cannot:['Add or edit individual equipment records directly (that happens at the facility level)'] },
+  { role:'regional_director', title:'Regional Director', icon:'fa-eye', pill:'info',
+    blurb:'Sees everything a Regional Administrator sees, region-wide — but strictly read-only.',
+    can:['View every facility, all equipment, maintenance, transfers, users, and reports region-wide','Export and print reports'],
+    cannot:['Add, edit, or delete anything — facilities, equipment, users, tickets, or transfers','Approve transfers or manage users','Change their own role (only a Regional Administrator can add, edit, or remove a Director)'] },
+  { role:'facility_admin', title:'Facility Administrator', icon:'fa-hospital-user', pill:'warn',
+    blurb:'Runs the day-to-day equipment register for their own facility.',
+    can:['Add, edit, and delete equipment at their facility','Import equipment in bulk from an Excel spreadsheet, or export the current register','Report and manage maintenance tickets, and assign them to engineers','Add calibration records and upload documents (manuals, certificates, warranties, photos)','Request equipment transfers to other facilities','Add, edit, and deactivate Viewer, Engineer, and Facility Administrator accounts at their own facility'],
+    cannot:['See or act on other facilities\' data','Promote anyone to Regional Administrator or Regional Director'] },
+  { role:'engineer', title:'Biomedical Engineer', icon:'fa-screwdriver-wrench', pill:'neutral',
+    blurb:'Handles hands-on maintenance and equipment condition at their facility.',
+    can:['View their facility\'s equipment and maintenance tickets','Update equipment condition and calibration status','Update maintenance tickets that are assigned to them, add notes and repair cost','Add calibration records and upload documents'],
+    cannot:['Add or delete equipment records','Manage other users','See or update a maintenance ticket assigned to a different engineer'] },
+  { role:'viewer', title:'Viewer', icon:'fa-glasses', pill:'neutral',
+    blurb:'Read-only access — for anyone who needs visibility without needing to make changes.',
+    can:['View their facility\'s dashboard, equipment register, and maintenance status'],
+    cannot:['Add, edit, or delete anything, anywhere'] }
+];
+
+function renderHelp(){
+  setPageTitle('Help Guide');
+  const myRole = STATE.profile.role;
+  mainEl().innerHTML = `
+    <div class="section-head">
+      <h2>How to Use This Platform</h2>
+      <span class="hint">You're signed in as ${esc(ROLE_LABELS[myRole]||myRole)}</span>
+    </div>
+    <div class="tabs">
+      <button class="tab-btn ${helpTab==='start'?'active':''}" data-help="start"><i class="fa-solid fa-flag-checkered"></i>Getting Started</button>
+      <button class="tab-btn ${helpTab==='roles'?'active':''}" data-help="roles"><i class="fa-solid fa-users"></i>Roles &amp; Permissions</button>
+      <button class="tab-btn ${helpTab==='sections'?'active':''}" data-help="sections"><i class="fa-solid fa-list"></i>App Sections</button>
+      <button class="tab-btn ${helpTab==='faq'?'active':''}" data-help="faq"><i class="fa-solid fa-circle-question"></i>FAQ</button>
+    </div>
+    <div id="helpBody"></div>
+  `;
+  document.querySelectorAll('[data-help]').forEach(btn => {
+    btn.addEventListener('click', () => { helpTab = btn.getAttribute('data-help'); rerenderCurrent(); });
+  });
+  renderHelpBody(myRole);
+}
+
+function renderHelpBody(myRole){
+  const body = qs('helpBody');
+  if(helpTab === 'start'){
+    body.innerHTML = `
+      <div class="panel" style="margin-bottom:16px;">
+        <h3>What is the CEU Regional Platform?</h3>
+        <p style="font-size:13.5px; color:var(--muted); line-height:1.6; margin:0;">
+          This is the Western Region Health Directorate's clinical engineering equipment management system.
+          It tracks medical equipment across every facility in the region — condition, calibration status,
+          maintenance history, and asset transfers — from one place, with each facility responsible for its own
+          register and the region able to see the full picture.
+        </p>
+      </div>
+      <div class="panel">
+        <h3>Three things to know before you start</h3>
+        <div class="timeline">
+          <div class="timeline-item"><div class="timeline-dot"></div><div class="timeline-body">
+            <div class="t1">New accounts start as read-only Viewers</div>
+            <div class="t2">When you first create an account, you can sign in but can't change anything yet. A Regional Administrator or your Facility Administrator needs to assign you a role and facility — ask them once you've signed up.</div>
+          </div></div>
+          <div class="timeline-item"><div class="timeline-dot"></div><div class="timeline-body">
+            <div class="t1">Every equipment record has a QR code</div>
+            <div class="t2">Open any piece of equipment and check its "QR Code" tab. Print it and stick it on the physical device — scanning it later opens that exact equipment profile (you'll need to sign in first if you aren't already).</div>
+          </div></div>
+          <div class="timeline-item"><div class="timeline-dot"></div><div class="timeline-body">
+            <div class="t1">Password resets aren't self-service yet</div>
+            <div class="t2">If you forget your password, contact your Regional or Facility Administrator directly — they can reset it for you right away.</div>
+          </div></div>
+        </div>
+      </div>
+    `;
+  } else if(helpTab === 'roles'){
+    body.innerHTML = ROLE_SUMMARIES.map(r => `
+      <div class="panel" style="margin-bottom:14px; ${r.role===myRole ? 'border-color:var(--teal); box-shadow:0 0 0 2px rgba(30,58,110,0.12);' : ''}">
+        <div style="display:flex; align-items:center; gap:10px; margin-bottom:8px;">
+          <i class="fa-solid ${r.icon}" style="font-size:16px; color:var(--teal);"></i>
+          <h3 style="margin:0;">${esc(r.title)}</h3>
+          <span class="pill ${r.pill}">${r.role===myRole?'This is you':esc(ROLE_LABELS[r.role])}</span>
+        </div>
+        <p style="font-size:13px; color:var(--muted); margin:0 0 10px;">${esc(r.blurb)}</p>
+        <div class="kv-grid">
+          <div class="kv span2"><div class="k">Can do</div><div class="v">
+            <ul style="margin:4px 0 0; padding-left:18px; font-weight:400; font-size:13px; line-height:1.7;">
+              ${r.can.map(x => `<li>${esc(x)}</li>`).join('')}
+            </ul>
+          </div></div>
+          <div class="kv span2"><div class="k">Cannot do</div><div class="v">
+            <ul style="margin:4px 0 0; padding-left:18px; font-weight:400; font-size:13px; line-height:1.7; color:var(--muted);">
+              ${r.cannot.map(x => `<li>${esc(x)}</li>`).join('')}
+            </ul>
+          </div></div>
+        </div>
+      </div>
+    `).join('');
+  } else if(helpTab === 'sections'){
+    const sections = [
+      { icon:'fa-gauge-high', title:'Dashboard', desc:'Your home screen. Shows key stats (total assets, functional vs. faulty, calibration overdue), condition and calibration charts, and a "Needs Attention" list of equipment with problems. Regional Administrators and Directors see the whole region; everyone else sees their own facility.' },
+      { icon:'fa-hospital', title:'Facilities', desc:'Regional Administrators and Directors only. Lists every facility in the region with a quick health snapshot. Click one to see its full dashboard. Administrators can add, edit, or delete facilities from here.' },
+      { icon:'fa-kit-medical', title:'Equipment', desc:'The full equipment register: search, filter, and sort every asset. Click any item to see its full profile across five tabs — Overview, Maintenance History, Calibration History, Documents, and QR Code. Facility Administrators can add, edit, delete, import from Excel, or export the register.' },
+      { icon:'fa-screwdriver-wrench', title:'Maintenance', desc:'A kanban board tracking every repair ticket through Reported → Assigned → Repairing → Completed → Closed. Facility Administrators and Engineers can report issues and update tickets; Engineers only see full edit access on tickets assigned to them.' },
+      { icon:'fa-truck-fast', title:'Transfers', desc:'Request equipment be moved from one facility to another. Facility Administrators submit requests; Regional Administrators approve or reject them, which automatically relocates the asset; the receiving facility confirms once it physically arrives.' },
+      { icon:'fa-file-lines', title:'Reports', desc:'Export or print the Equipment Register, a Maintenance Report (repair frequency and cost), and — for Regional Administrators and Directors — a Regional Facility Comparison.' },
+      { icon:'fa-users-gear', title:'Users', desc:'Manage who has access. Regional Administrators and Facility Administrators can assign roles and facilities; Regional Directors can view the list but not make changes.' },
+      { icon:'fa-gear', title:'Settings', desc:'Update your display name or change your password.' },
+      { icon:'fa-arrow-up-right-from-square', title:'CEU Dashboard (Fault Reporting, Installation Request, Equipment Request)', desc:'Three links at the bottom of the sidebar that open the region\'s public equipment-request site in a new tab — for reporting a fault, requesting installation/training on new equipment, or requesting equipment your facility needs. That site is separate from this app and needs no login of its own.' }
+    ];
+    body.innerHTML = sections.map(s => `
+      <div class="panel" style="margin-bottom:12px; display:flex; gap:14px; align-items:flex-start;">
+        <i class="fa-solid ${s.icon}" style="font-size:16px; color:var(--teal); margin-top:2px; width:20px; text-align:center;"></i>
+        <div><h3 style="margin:0 0 4px;">${esc(s.title)}</h3><p style="font-size:13px; color:var(--muted); margin:0; line-height:1.6;">${esc(s.desc)}</p></div>
+      </div>
+    `).join('');
+  } else if(helpTab === 'faq'){
+    const faqs = [
+      { q:'I just signed up and can\'t do anything — is that a bug?', a:'No — every new account starts as a read-only Viewer with no facility assigned, on purpose. Ask your Regional or Facility Administrator to assign your role and facility in the Users section, and you\'ll get access right away.' },
+      { q:'I forgot my password — what do I do?', a:'Password resets aren\'t self-service yet. Contact your Regional or Facility Administrator and they can reset it for you directly, no email required.' },
+      { q:'What\'s the difference between "Functional but Not in Use", "Needs Repair", and "Obsolete"?', a:'These are equipment condition options for anything that isn\'t simply working or broken: "Functional but Not in Use" is working but idle, "Needs Repair" is a known problem not yet critical, and "Obsolete" flags equipment for eventual retirement. All three show up wherever condition is tracked, and "Needs Repair" and "Obsolete" also surface on the "Needs Attention" list.' },
+      { q:'How do I add a lot of equipment at once instead of one at a time?', a:'On the Equipment page, Facility Administrators can click "Template" to download a correctly-formatted spreadsheet, fill it in, then click "Import from Excel" to upload it. You\'ll see a preview of what will be added or updated before anything is saved.' },
+      { q:'What does the QR code on an equipment page actually do?', a:'It\'s a direct link to that equipment\'s profile page. Print it and attach it to the physical device — anyone who scans it later (and signs in, if they aren\'t already) lands straight on that equipment\'s record.' },
+      { q:'Why can\'t I see equipment from another facility?', a:'By design — each facility\'s data is only visible to its own staff, plus Regional Administrators and Regional Directors who oversee the whole region. This keeps each facility\'s register private to the people responsible for it.' },
+      { q:'What are the Fault Reporting / Installation Request / Equipment Request links at the bottom of the sidebar?', a:'These open the region\'s public-facing CEU Dashboard in a new tab — a separate tool for submitting a fault report, requesting installation/training on new equipment, or requesting equipment. It doesn\'t need its own login, but you do need to be signed in here first to see the links.' }
+    ];
+    body.innerHTML = faqs.map((f,i) => `
+      <div class="panel" style="margin-bottom:10px;">
+        <h3 style="margin:0 0 6px; text-transform:none; letter-spacing:0; font-size:13.5px; color:var(--ink);">${esc(f.q)}</h3>
+        <p style="font-size:13px; color:var(--muted); margin:0; line-height:1.6;">${esc(f.a)}</p>
+      </div>
+    `).join('');
+  }
+}
+
 function renderSettings(){
   setPageTitle('Settings');
   const p = STATE.profile;
