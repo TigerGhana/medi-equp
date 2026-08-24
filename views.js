@@ -9,7 +9,7 @@ const { STATE, esc, dash, setText, qs, fmtDate, fmtDateTime, isOverdue, needsAtt
   conditionPillClass, calPillClass, priorityPillClass, statusPillClass,
   facilityById, facilityName, equipmentById, userById, userName, categoryName,
   CONDITION_OPTIONS, CAL_STATUS_OPTIONS, PRIORITY_OPTIONS, MAINT_STATUS_OPTIONS, ROLE_OPTIONS, ROLE_LABELS, DOC_TYPES,
-  isRegionalAdmin, isRegionalDirector, isRegionalScoped, isFacilityAdmin, isEngineer, canEditEquipment, canEditMaintenance, canManageUsers,
+  isRegionalAdmin, isRegionalDirector, isRegionalScoped, isFacilityAdmin, isEngineer, canEditEquipment, canDeleteEquipment, canEditMaintenance, canManageUsers,
   canApproveTransfers, canRequestTransfers, openModal, closeModal, showError, showInfo, describeError, sb } = APP;
 
 let currentView = { name: 'dashboard', param: null };
@@ -170,7 +170,7 @@ function renderRegionalDashboard(){
 
   const kpis = [
     { label:'Facilities', value: STATE.facilities.length, icon:'fa-hospital', cls:'' },
-    { label:'Total Assets', value: total, icon:'fa-boxes-stacked', cls:'' },
+    { label:'Total Equipment', value: total, icon:'fa-boxes-stacked', cls:'' },
     { label:'Functional', value: functional, icon:'fa-circle-check', cls:'ok' },
     { label:'Non-Functional', value: nonFunctional, icon:'fa-circle-xmark', cls: nonFunctional>0 ? 'bad':'' },
     { label:'Calibration Due', value: calOverdue, icon:'fa-clock', cls: calOverdue>0 ? 'warn':'' },
@@ -195,7 +195,7 @@ function renderRegionalDashboard(){
         <h3>Facility Performance — ${esc(region ? region.name : 'Your Region')}</h3>
         <div class="table-shell"><div class="table-scroll" style="max-height:420px;">
           <table><thead><tr>
-            <th class="no-sort">Facility</th><th class="no-sort">District</th><th class="no-sort">Assets</th>
+            <th class="no-sort">Facility</th><th class="no-sort">District</th><th class="no-sort">Equipment</th>
             <th class="no-sort">Functional %</th><th class="no-sort">Faulty</th><th class="no-sort">Cal. Issues</th><th class="no-sort">Status</th>
           </tr></thead><tbody id="facPerfBody">
             ${facRows.length === 0 ? `<tr><td colspan="7"><div class="no-results">No facilities in this region yet.</div></td></tr>` :
@@ -203,7 +203,7 @@ function renderRegionalDashboard(){
               <tr data-fid="${r.f.id}">
                 <td data-label="Facility" class="name-cell">${esc(r.f.name)}</td>
                 <td data-label="District">${esc(dash(r.f.district))}</td>
-                <td data-label="Assets" class="mono">${r.m.total}</td>
+                <td data-label="Equipment" class="mono">${r.m.total}</td>
                 <td data-label="Functional %" class="mono">${r.m.pct}%</td>
                 <td data-label="Faulty" class="mono">${r.m.nonFunctional}</td>
                 <td data-label="Cal. Issues" class="mono">${r.m.overdue}</td>
@@ -221,7 +221,7 @@ function renderRegionalDashboard(){
     <div class="panel-grid3">
       <div class="panel"><h3>Calibration Status</h3><div class="chart-wrap"><canvas id="chartRegionCal"></canvas></div></div>
       <div class="panel"><h3>Top Manufacturers</h3><div class="barlist" id="regionManBar"></div></div>
-      <div class="panel"><h3>Assets by Facility</h3><div class="barlist" id="regionFacBar"></div></div>
+      <div class="panel"><h3>Equipment by Facility</h3><div class="barlist" id="regionFacBar"></div></div>
     </div>
   `;
 
@@ -270,7 +270,7 @@ function renderFacilityDashboardInto(container, f, opts){
   const openTickets = STATE.maintenance.filter(t => equipmentById(t.equipmentId) && equipmentById(t.equipmentId).facilityId === f.id && ['reported','assigned','repairing'].includes(t.status));
 
   const kpis = [
-    { label:'Total Assets', value:m.total, icon:'fa-boxes-stacked' },
+    { label:'Total Equipment', value:m.total, icon:'fa-boxes-stacked' },
     { label:'Functional', value:`${m.functional} / ${m.total}`, icon:'fa-circle-check', cls:'ok' },
     { label:'Non-Functional', value:m.nonFunctional, icon:'fa-circle-xmark', cls:m.nonFunctional>0?'bad':'' },
     { label:'Calibration Overdue', value:m.overdue, icon:'fa-clock', cls:m.overdue>0?'warn':'' },
@@ -386,7 +386,7 @@ function renderFacilitiesList(){
       return `<div class="facility-card" data-fid="${f.id}">
         <div class="fname">${esc(f.name)}</div>
         <div class="fmeta">${esc(f.facilityType)} · ${esc(dash(f.district))}</div>
-        <div class="frow"><span>Total Assets</span><strong class="mono">${m.total}</strong></div>
+        <div class="frow"><span>Total Equipment</span><strong class="mono">${m.total}</strong></div>
         <div class="frow"><span>Functional</span><strong class="mono" style="color:var(--ok)">${m.functional}</strong></div>
         <div class="frow"><span>Non-Functional</span><strong class="mono" style="color:${m.nonFunctional>0?'var(--bad)':'inherit'}">${m.nonFunctional}</strong></div>
         <div class="frow"><span>Calibration Overdue</span><strong class="mono" style="color:${m.overdue>0?'var(--warn)':'inherit'}">${m.overdue}</strong></div>
@@ -514,7 +514,7 @@ function renderEquipmentList(){
     </div>
     <div class="controls">
       <div class="search-box"><i class="fa-solid fa-magnifying-glass"></i>
-        <input type="text" id="eqSearch" placeholder="Search by name, serial, asset code or manufacturer…" value="${esc(eqFilters.q)}">
+        <input type="text" id="eqSearch" placeholder="Search by name, serial, equipment code or manufacturer…" value="${esc(eqFilters.q)}">
       </div>
       ${showFacilityCol ? `<select id="eqFilterFacility"><option value="">All facilities</option>${STATE.facilities.map(f => `<option value="${f.id}" ${eqFilters.facility===f.id?'selected':''}>${esc(f.name)}</option>`).join('')}</select>` : ''}
       <select id="eqFilterCondition"><option value="">All conditions</option>${CONDITION_OPTIONS.map(c => `<option ${eqFilters.condition===c?'selected':''}>${c}</option>`).join('')}</select>
@@ -537,7 +537,7 @@ function renderEquipmentList(){
     <div class="result-count" id="eqResultCount"></div>
     <div class="table-shell"><div class="table-scroll">
       <table><thead><tr>
-        <th class="no-sort">Asset Code</th><th class="no-sort">Equipment</th>
+        <th class="no-sort">Equipment Code</th><th class="no-sort">Equipment</th>
         ${showFacilityCol ? '<th class="no-sort">Facility</th>' : ''}
         <th class="no-sort">Department</th><th class="no-sort">Condition</th><th class="no-sort">Manufacturer</th>
         <th class="no-sort">Serial No.</th><th class="no-sort">Calibration</th><th class="no-sort">Next Cal.</th>
@@ -597,13 +597,13 @@ function renderEquipmentTableBody(){
     av = av || ''; bv = bv || '';
     if(av < bv) return -1*eqSort.dir; if(av > bv) return 1*eqSort.dir; return 0;
   });
-  setText('eqResultCount', `Showing ${rows.length} of ${STATE.equipment.length} assets`);
+  setText('eqResultCount', `Showing ${rows.length} of ${STATE.equipment.length} equipment`);
   const tbody = qs('eqTableBody');
   if(!tbody) return;
   if(rows.length === 0){ tbody.innerHTML = `<tr><td colspan="9"><div class="no-results">No equipment matches these filters.</div></td></tr>`; return; }
   tbody.innerHTML = rows.map(e => `
     <tr data-id="${e.id}">
-      <td data-label="Asset Code" class="mono">${esc(dash(e.assetCode))}</td>
+      <td data-label="Equipment Code" class="mono">${esc(dash(e.assetCode))}</td>
       <td data-label="Equipment" class="name-cell">${esc(e.name)}</td>
       ${showFacilityCol ? `<td data-label="Facility">${esc(facilityName(e.facilityId))}</td>` : ''}
       <td data-label="Department">${esc(dash(e.department))}</td>
@@ -618,7 +618,7 @@ function renderEquipmentTableBody(){
 
 function exportEquipmentCsv(rows){
   const data = rows.map(e => ({
-    'Asset Code': e.assetCode||'', 'Equipment Name': e.name, 'Facility': facilityName(e.facilityId),
+    'Equipment Code': e.assetCode||'', 'Equipment Name': e.name, 'Facility': facilityName(e.facilityId),
     'Department': e.department||'', 'Category': categoryName(e.categoryId), 'Manufacturer': e.manufacturer,
     'Model': e.model||'', 'Serial Number': e.serial||'', 'Condition': e.condition,
     'Installation Date': e.installDate||'', 'Warranty Expiry': e.warrantyExpiry||'',
@@ -626,9 +626,9 @@ function exportEquipmentCsv(rows){
     'Location': e.location||'', 'Responsible Person': e.responsiblePerson||''
   }));
   const ws = XLSX.utils.json_to_sheet(data);
-  // Force Asset Code / Serial Number to text so Excel never reinterprets a
+  // Force Equipment Code / Serial Number to text so Excel never reinterprets a
   // numeric-looking code as a number on a later re-import.
-  ['Asset Code','Serial Number'].forEach(header => {
+  ['Equipment Code','Serial Number'].forEach(header => {
     const colIdx = Object.keys(data[0]||{}).indexOf(header);
     if(colIdx === -1) return;
     for(let r = 0; r < data.length; r++){
@@ -645,11 +645,11 @@ function exportEquipmentCsv(rows){
 // =====================================================================
 // EQUIPMENT BULK IMPORT (Excel/CSV) — facility_admin only, scoped to
 // their own facility. Parse -> validate -> preview -> confirm -> commit,
-// matching existing records by Asset Code so re-importing an updated
+// matching existing records by Equipment Code so re-importing an updated
 // spreadsheet safely updates rather than duplicates.
 // =====================================================================
 const IMPORT_COLUMNS = [
-  { header:'Asset Code', field:'assetCode', required:true },
+  { header:'Equipment Code', field:'assetCode', required:true },
   { header:'Equipment Name', field:'name', required:true },
   { header:'Department', field:'department' },
   { header:'Category', field:'categoryName' },
@@ -692,7 +692,7 @@ function excelDateToISO(v){
 function downloadImportTemplate(){
   const sampleRow = {};
   IMPORT_COLUMNS.forEach(c => { sampleRow[c.header] = ''; });
-  sampleRow['Asset Code'] = 'WR-PHRL-000999';
+  sampleRow['Equipment Code'] = 'WR-PHRL-000999';
   sampleRow['Equipment Name'] = 'Example: Blood Pressure Monitor';
   sampleRow['Condition'] = 'FUNCTIONAL';
   sampleRow['Calibration Status'] = 'Not Specified';
@@ -760,7 +760,7 @@ function processImportRows(rawRows){
 
     const errs = [];
     if(!rec.name) errs.push('Equipment Name is required');
-    if(!rec.assetCode) errs.push('Asset Code is required');
+    if(!rec.assetCode) errs.push('Equipment Code is required');
     if(rec.condition && !CONDITION_OPTIONS.includes(rec.condition)) errs.push(`Condition must be one of: ${CONDITION_OPTIONS.join(', ')}`);
     if(rec.calibrationStatus && !CAL_STATUS_OPTIONS.includes(rec.calibrationStatus)) errs.push(`Calibration Status must be one of: ${CAL_STATUS_OPTIONS.join(', ')}`);
     IMPORT_DATE_FIELDS.forEach(f => { if(rec[f] && !/^\d{4}-\d{2}-\d{2}$/.test(rec[f])) errs.push(`${f} is not a recognizable date (${rec[f]})`); });
@@ -808,7 +808,7 @@ function renderEquipmentImportPreview(){
       ${p.invalid.slice(0,50).map(r => `<div style="margin-bottom:6px;"><strong>Row ${r.rowNum}</strong> (${esc(r.name)}): ${esc(r.errors.join('; '))}</div>`).join('')}
       ${p.invalid.length > 50 ? `<div>...and ${p.invalid.length - 50} more</div>` : ''}
     </div>` : ''}
-    <p style="font-size:12px; color:var(--muted-2); margin:0 0 16px;">Matched to existing equipment by <strong>Asset Code</strong> within your facility. Unmatched codes will be added as new records. Unknown Category names are imported without a category rather than rejected.</p>
+    <p style="font-size:12px; color:var(--muted-2); margin:0 0 16px;">Matched to existing equipment by <strong>Equipment Code</strong> within your facility. Unmatched codes will be added as new records. Unknown Category names are imported without a category rather than rejected.</p>
     <div class="modal-actions"><div class="left"></div><div class="right">
       <button class="btn-secondary" id="eqImportCancel">Cancel</button>
       <button class="btn-primary" id="eqImportConfirm" style="width:auto;" ${totalValid===0?'disabled':''}>Import ${totalValid} row${totalValid===1?'':'s'}</button>
@@ -869,17 +869,18 @@ function textareaField(id, label, value){
 
 function openEquipmentForm(rec){
   const isNew = !rec;
+  const facilityLocked = isFacilityAdmin() || isEngineer(); // both work within their own facility only; only a (currently unreachable via UI) regional role would see a facility picker
   const r = rec || { name:'', assetCode:'', categoryId:'', department:'', location:'', manufacturer:'', model:'', serial:'',
     condition:'FUNCTIONAL', installDate:'', warrantyExpiry:'', calibrationStatus:'Not Specified', nextCalibration:'',
-    responsiblePerson:'', owner:'', facilityId: isFacilityAdmin() ? STATE.profile.facilityId : '' };
-  const facilityOptions = isFacilityAdmin()
+    responsiblePerson:'', owner:'', facilityId: facilityLocked ? STATE.profile.facilityId : '' };
+  const facilityOptions = facilityLocked
     ? `<div class="form-field"><label>Facility</label><input type="text" value="${esc(facilityName(STATE.profile.facilityId))}" disabled></div>`
     : `<div class="form-field"><label>Facility *</label><select id="ef_facility">${STATE.facilities.map(f => `<option value="${f.id}" ${f.id===r.facilityId?'selected':''}>${esc(f.name)}</option>`).join('')}</select></div>`;
 
   const body = `
     <div class="form-grid">
       ${field('ef_name','Equipment Name','text', r.name, true)}
-      ${field('ef_assetCode','Asset Code','text', r.assetCode, true)}
+      ${field('ef_assetCode','Equipment Code','text', r.assetCode, true)}
       ${facilityOptions}
       ${selectField('ef_category','Category', ['', ...STATE.categories.map(c=>c.id)], r.categoryId, v => v ? categoryName(v) : '— none —')}
       ${field('ef_department','Department / Ward','text', r.department)}
@@ -897,13 +898,13 @@ function openEquipmentForm(rec){
     </div>
     <div class="field-error" id="ef_error"></div>
     <div class="modal-actions">
-      <div class="left">${!isNew && isFacilityAdmin() ? '<button class="btn-danger" id="ef_delete">Delete</button>' : ''}</div>
+      <div class="left">${!isNew && canDeleteEquipment() ? '<button class="btn-danger" id="ef_delete">Delete</button>' : ''}</div>
       <div class="right"><button class="btn-secondary" id="ef_cancel">Cancel</button><button class="btn-primary" id="ef_save" style="width:auto;">${isNew?'Add Equipment':'Save Changes'}</button></div>
     </div>
   `;
   openModal({ title: isNew ? 'Add Equipment' : `Editing: ${r.name}`, code: isNew ? 'New record' : (r.assetCode||'—'), bodyHtml: body, wide:true });
   qs('ef_cancel').addEventListener('click', closeModal);
-  if(!isNew && isFacilityAdmin()){
+  if(!isNew && canDeleteEquipment()){
     qs('ef_delete').addEventListener('click', () => confirmDeleteEquipment(rec));
   }
   qs('ef_save').addEventListener('click', () => submitEquipmentForm(isNew, rec));
@@ -914,7 +915,7 @@ async function submitEquipmentForm(isNew, rec){
   const form = {
     name: qs('ef_name').value.trim(),
     assetCode: qs('ef_assetCode').value.trim(),
-    facilityId: isFacilityAdmin() ? STATE.profile.facilityId : qs('ef_facility').value,
+    facilityId: (isFacilityAdmin() || isEngineer()) ? STATE.profile.facilityId : qs('ef_facility').value,
     categoryId: qs('ef_category').value || null,
     department: qs('ef_department').value.trim(),
     location: qs('ef_location').value.trim(),
@@ -930,7 +931,7 @@ async function submitEquipmentForm(isNew, rec){
     owner: qs('ef_owner').value.trim()
   };
   if(!form.name){ errEl.textContent = 'Equipment name is required.'; errEl.classList.add('show'); return; }
-  if(!form.assetCode){ errEl.textContent = 'Asset code is required.'; errEl.classList.add('show'); return; }
+  if(!form.assetCode){ errEl.textContent = 'Equipment code is required.'; errEl.classList.add('show'); return; }
   if(!form.facilityId){ errEl.textContent = 'Facility is required.'; errEl.classList.add('show'); return; }
 
   const btn = qs('ef_save'); btn.disabled = true; btn.textContent = 'Saving…';
@@ -970,7 +971,7 @@ function renderEquipmentDetail(id){
   const e = equipmentById(id);
   if(!e){
     setPageTitle('Equipment not found');
-    mainEl().innerHTML = `<div class="empty-state"><i class="fa-solid fa-magnifying-glass"></i><p>That asset doesn't exist, or you don't have access to it.<br><a href="#/equipment" style="color:var(--teal); font-weight:600;">Back to inventory</a></p></div>`;
+    mainEl().innerHTML = `<div class="empty-state"><i class="fa-solid fa-magnifying-glass"></i><p>That equipment doesn't exist, or you don't have access to it.<br><a href="#/equipment" style="color:var(--teal); font-weight:600;">Back to inventory</a></p></div>`;
     return;
   }
   setPageTitle(e.name);
@@ -984,7 +985,11 @@ function renderEquipmentDetail(id){
       <h2 style="text-transform:none; letter-spacing:0; font-size:20px;">${esc(e.name)}</h2>
       <span class="hint">${esc(dash(e.assetCode))} · ${esc(facilityName(e.facilityId))}</span>
     </div>
-    ${canEditEquipment() ? `<div class="controls" style="margin-bottom:6px;"><button class="btn-secondary" id="btnEditEq"><i class="fa-solid fa-pen"></i> Edit</button><button class="btn-danger" id="btnDelEq">Delete</button>${canRequestTransfers() ? `<button class="btn-add" id="btnTransferEq"><i class="fa-solid fa-truck-fast"></i> Request Transfer</button>` : ''}</div>` : ''}
+    ${(canEditEquipment() || canDeleteEquipment()) ? `<div class="controls" style="margin-bottom:6px;">
+      ${canEditEquipment() ? `<button class="btn-secondary" id="btnEditEq"><i class="fa-solid fa-pen"></i> Edit</button>` : ''}
+      ${canDeleteEquipment() ? `<button class="btn-danger" id="btnDelEq">Delete</button>` : ''}
+      ${canRequestTransfers() ? `<button class="btn-add" id="btnTransferEq"><i class="fa-solid fa-truck-fast"></i> Request Transfer</button>` : ''}
+    </div>` : ''}
     <div class="tabs">
       <button class="tab-btn active" data-tab="overview"><i class="fa-solid fa-circle-info"></i>Overview</button>
       <button class="tab-btn" data-tab="maintenance"><i class="fa-solid fa-screwdriver-wrench"></i>Maintenance (${maint.length})</button>
@@ -1006,11 +1011,9 @@ function renderEquipmentDetail(id){
       if(eqDetailTab === 'qr') renderQrTab(e);
     });
   });
-  if(canEditEquipment()){
-    qs('btnEditEq').addEventListener('click', () => openEquipmentForm(e));
-    qs('btnDelEq').addEventListener('click', () => confirmDeleteEquipment(e));
-    const tBtn = qs('btnTransferEq'); if(tBtn) tBtn.addEventListener('click', () => openTransferForm(e));
-  }
+  const editBtnEq = qs('btnEditEq'); if(editBtnEq) editBtnEq.addEventListener('click', () => openEquipmentForm(e));
+  const delBtnEq = qs('btnDelEq'); if(delBtnEq) delBtnEq.addEventListener('click', () => confirmDeleteEquipment(e));
+  const tBtn = qs('btnTransferEq'); if(tBtn) tBtn.addEventListener('click', () => openTransferForm(e));
   renderOverviewTab(e);
   renderMaintenanceTab(e, maint);
   renderCalibrationTab(e, cal);
@@ -1035,7 +1038,7 @@ function renderOverviewTab(e){
       ${kv('Manufacturer', esc(e.manufacturer))}
       ${kv('Model', esc(dash(e.model)))}
       ${kv('Serial Number', esc(dash(e.serial)), false, true)}
-      ${kv('Asset Code', esc(dash(e.assetCode)), false, true)}
+      ${kv('Equipment Code', esc(dash(e.assetCode)), false, true)}
       ${kv('Installation Date', fmtDate(e.installDate), false, true)}
       ${kv('Warranty Expiry', fmtDate(e.warrantyExpiry), false, true)}
       ${kv('Responsible Person', esc(dash(e.responsiblePerson)))}
@@ -1049,7 +1052,7 @@ function renderMaintenanceTab(e, maint){
   const canAct = canEditMaintenance();
   qs('tab-maintenance').innerHTML = `
     <div class="controls" style="margin-bottom:14px;">${canAct ? `<button class="btn-add" id="btnNewTicket"><i class="fa-solid fa-plus"></i> Report Issue</button>` : ''}</div>
-    ${maint.length === 0 ? `<div class="empty-state"><i class="fa-solid fa-screwdriver-wrench"></i><p>No maintenance tickets recorded for this asset.</p></div>` : `
+    ${maint.length === 0 ? `<div class="empty-state"><i class="fa-solid fa-screwdriver-wrench"></i><p>No maintenance tickets recorded for this equipment.</p></div>` : `
     <div class="timeline">${maint.map(m => `
       <div class="timeline-item">
         <div class="timeline-dot" style="background:${m.status==='completed'||m.status==='closed'?'#1E9E64':(m.priority==='critical'?'#D14343':'#C9861A')}"></div>
@@ -1069,7 +1072,7 @@ function renderCalibrationTab(e, cal){
   const canAct = canEditMaintenance();
   qs('tab-calibration').innerHTML = `
     <div class="controls" style="margin-bottom:14px;">${canAct ? `<button class="btn-add" id="btnNewCal"><i class="fa-solid fa-plus"></i> Add Calibration Record</button>` : ''}</div>
-    ${cal.length === 0 ? `<div class="empty-state"><i class="fa-solid fa-gauge"></i><p>No calibration history recorded for this asset.</p></div>` : `
+    ${cal.length === 0 ? `<div class="empty-state"><i class="fa-solid fa-gauge"></i><p>No calibration history recorded for this equipment.</p></div>` : `
     <div class="table-shell"><table><thead><tr><th class="no-sort">Date</th><th class="no-sort">Result</th><th class="no-sort">Performed By</th><th class="no-sort">Certificate</th></tr></thead><tbody>
       ${cal.map(c => `<tr><td data-label="Date" class="mono">${fmtDate(c.date)}</td><td data-label="Result">${esc(c.result)}</td><td data-label="Performed By">${esc(dash(c.performedBy))}</td>
         <td data-label="Certificate">${c.certificateUrl ? `<a href="${esc(c.certificateUrl)}" target="_blank" rel="noopener" style="color:var(--teal); font-weight:600;">View <i class="fa-solid fa-arrow-up-right-from-square" style="font-size:10px;"></i></a>` : '—'}</td></tr>`).join('')}
@@ -1449,7 +1452,7 @@ function renderReports(){
     <div class="panel-grid3">
       <div class="panel">
         <h3>Equipment Register</h3>
-        <p style="font-size:12.5px; color:var(--muted); margin:0 0 14px;">Full inventory list with condition, calibration and location for every asset in your scope.</p>
+        <p style="font-size:12.5px; color:var(--muted); margin:0 0 14px;">Full inventory list with condition, calibration and location for every piece of equipment in your scope.</p>
         <div style="display:flex; gap:8px;"><button class="btn-secondary" id="repEqCsv"><i class="fa-solid fa-file-arrow-down"></i> Export</button><button class="btn-secondary" id="repEqPrint"><i class="fa-solid fa-print"></i> Print</button></div>
       </div>
       <div class="panel">
@@ -1476,7 +1479,7 @@ function renderReports(){
 
 function buildEquipmentReportHtml(){
   return `<table style="width:100%; border-collapse:collapse; font-size:12px;">
-    <thead><tr style="background:#0D1B2E; color:#fff;">${['Asset Code','Name','Facility','Department','Condition','Manufacturer','Calibration','Next Cal.'].map(h=>`<th style="padding:6px 8px; text-align:left;">${h}</th>`).join('')}</tr></thead>
+    <thead><tr style="background:#0D1B2E; color:#fff;">${['Equipment Code','Name','Facility','Department','Condition','Manufacturer','Calibration','Next Cal.'].map(h=>`<th style="padding:6px 8px; text-align:left;">${h}</th>`).join('')}</tr></thead>
     <tbody>${STATE.equipment.map(e => `<tr style="border-bottom:1px solid #ddd;">
       <td style="padding:6px 8px;">${esc(dash(e.assetCode))}</td><td style="padding:6px 8px;">${esc(e.name)}</td>
       <td style="padding:6px 8px;">${esc(facilityName(e.facilityId))}</td><td style="padding:6px 8px;">${esc(dash(e.department))}</td>
@@ -1514,7 +1517,7 @@ function buildMaintenanceReportHtml(){
 function exportMaintenanceCsv(){
   const stats = maintenanceStats();
   csvDownload(`Maintenance_Report_${new Date().toISOString().slice(0,10)}.xlsx`, stats.map(s => ({
-    'Equipment': s.name, 'Asset Code': s.code||'', 'Facility': s.facility, 'Repair Count': s.count,
+    'Equipment': s.name, 'Equipment Code': s.code||'', 'Facility': s.facility, 'Repair Count': s.count,
     'Total Cost (GHS)': s.totalCost.toFixed(2), 'Avg Downtime (days)': s.completedCount ? (s.totalDowntimeDays/s.completedCount).toFixed(1) : ''
   })));
   showInfo('Export started — check your downloads.');
@@ -1522,7 +1525,7 @@ function exportMaintenanceCsv(){
 function buildRegionReportHtml(){
   const rows = STATE.facilities.map(f => { const m = computeFacilityMetrics(f.id); return { f, m }; });
   return `<table style="width:100%; border-collapse:collapse; font-size:12px;">
-    <thead><tr style="background:#0D1B2E; color:#fff;">${['Facility','District','Total Assets','Functional %','Faulty','Calibration Overdue'].map(h=>`<th style="padding:6px 8px; text-align:left;">${h}</th>`).join('')}</tr></thead>
+    <thead><tr style="background:#0D1B2E; color:#fff;">${['Facility','District','Total Equipment','Functional %','Faulty','Calibration Overdue'].map(h=>`<th style="padding:6px 8px; text-align:left;">${h}</th>`).join('')}</tr></thead>
     <tbody>${rows.map(r => `<tr style="border-bottom:1px solid #ddd;">
       <td style="padding:6px 8px;">${esc(r.f.name)}</td><td style="padding:6px 8px;">${esc(dash(r.f.district))}</td>
       <td style="padding:6px 8px;">${r.m.total}</td><td style="padding:6px 8px;">${r.m.pct}%</td>
@@ -1531,7 +1534,7 @@ function buildRegionReportHtml(){
 }
 function exportRegionCsv(){
   const rows = STATE.facilities.map(f => { const m = computeFacilityMetrics(f.id); return {
-    'Facility': f.name, 'District': f.district||'', 'Total Assets': m.total, 'Functional %': m.pct, 'Faulty': m.nonFunctional, 'Calibration Overdue': m.overdue
+    'Facility': f.name, 'District': f.district||'', 'Total Equipment': m.total, 'Functional %': m.pct, 'Faulty': m.nonFunctional, 'Calibration Overdue': m.overdue
   }; });
   csvDownload(`Regional_Comparison_${new Date().toISOString().slice(0,10)}.xlsx`, rows);
   showInfo('Export started — check your downloads.');
@@ -1600,7 +1603,7 @@ function openUserForm(u){
     const facilityId = qs('uf_facility').value || null;
     const isRegionScopedRole = role === 'regional_admin' || role === 'regional_director';
     if(!isRegionScopedRole && !facilityId){
-      errEl.textContent = 'Select a facility — every role except Regional Administrator and Regional Director must belong to one.';
+      errEl.textContent = 'Select a facility — every role except Regional Equipment Manager and Regional Director must belong to one.';
       errEl.classList.add('show');
       return;
     }
@@ -1626,22 +1629,22 @@ function openUserForm(u){
 // =====================================================================
 var helpTab = 'start';
 var ROLE_SUMMARIES = [
-  { role:'regional_admin', title:'Regional Administrator', icon:'fa-user-shield', pill:'ok',
+  { role:'regional_admin', title:'Regional Equipment Manager', icon:'fa-user-shield', pill:'ok',
     blurb:'Full oversight and control across every facility in the region.',
     can:['View every facility, all equipment, maintenance, transfers, and reports region-wide','Add, edit, and delete facilities','Approve or reject equipment transfer requests between facilities','Add, edit, and deactivate any user — including promoting Facility Administrators and Regional Directors','Upload the region banner image shown on the dashboard','Update maintenance tickets across any facility'],
     cannot:['Add or edit individual equipment records directly (that happens at the facility level)'] },
   { role:'regional_director', title:'Regional Director', icon:'fa-eye', pill:'info',
-    blurb:'Sees everything a Regional Administrator sees, region-wide — but strictly read-only.',
+    blurb:'Sees everything a Regional Equipment Manager sees, region-wide — but strictly read-only.',
     can:['View every facility, all equipment, maintenance, transfers, users, and reports region-wide','Export and print reports'],
-    cannot:['Add, edit, or delete anything — facilities, equipment, users, tickets, or transfers','Approve transfers or manage users','Change their own role (only a Regional Administrator can add, edit, or remove a Director)'] },
+    cannot:['Add, edit, or delete anything — facilities, equipment, users, tickets, or transfers','Approve transfers or manage users','Change their own role (only a Regional Equipment Manager can add, edit, or remove a Director)'] },
   { role:'facility_admin', title:'Facility Administrator', icon:'fa-hospital-user', pill:'warn',
     blurb:'Runs the day-to-day equipment register for their own facility.',
     can:['Add, edit, and delete equipment at their facility','Import equipment in bulk from an Excel spreadsheet, or export the current register','Report and manage maintenance tickets, and assign them to engineers','Add calibration records and upload documents (manuals, certificates, warranties, photos)','Request equipment transfers to other facilities','Add, edit, and deactivate Viewer, Engineer, and Facility Administrator accounts at their own facility'],
-    cannot:['See or act on other facilities\' data','Promote anyone to Regional Administrator or Regional Director'] },
+    cannot:['See or act on other facilities\' data','Promote anyone to Regional Equipment Manager or Regional Director'] },
   { role:'engineer', title:'Biomedical Engineer', icon:'fa-screwdriver-wrench', pill:'neutral',
-    blurb:'Handles hands-on maintenance and equipment condition at their facility.',
-    can:['View their facility\'s equipment and maintenance tickets','Update equipment condition and calibration status','Update maintenance tickets that are assigned to them, add notes and repair cost','Add calibration records and upload documents'],
-    cannot:['Add or delete equipment records','Manage other users','See or update a maintenance ticket assigned to a different engineer'] },
+    blurb:'Handles hands-on maintenance, equipment condition, and commissioning new equipment at their facility.',
+    can:['View their facility\'s equipment and maintenance tickets','Add new equipment records at their facility','Update equipment condition and calibration status','Update maintenance tickets that are assigned to them, add notes and repair cost','Add calibration records and upload documents'],
+    cannot:['Delete equipment records (Facility Administrators only)','Manage other users','See or update a maintenance ticket assigned to a different engineer'] },
   { role:'viewer', title:'Viewer', icon:'fa-glasses', pill:'neutral',
     blurb:'Read-only access — for anyone who needs visibility without needing to make changes.',
     can:['View their facility\'s dashboard, equipment register, and maintenance status'],
@@ -1679,7 +1682,7 @@ function renderHelpBody(myRole){
         <p style="font-size:13.5px; color:var(--muted); line-height:1.6; margin:0;">
           This is the Western Region Health Directorate's clinical engineering equipment management system.
           It tracks medical equipment across every facility in the region — condition, calibration status,
-          maintenance history, and asset transfers — from one place, with each facility responsible for its own
+          maintenance history, and equipment transfers — from one place, with each facility responsible for its own
           register and the region able to see the full picture.
         </p>
       </div>
@@ -1688,7 +1691,7 @@ function renderHelpBody(myRole){
         <div class="timeline">
           <div class="timeline-item"><div class="timeline-dot"></div><div class="timeline-body">
             <div class="t1">New accounts start as read-only Viewers</div>
-            <div class="t2">When you first create an account, you can sign in but can't change anything yet. A Regional Administrator or your Facility Administrator needs to assign you a role and facility — ask them once you've signed up.</div>
+            <div class="t2">When you first create an account, you can sign in but can't change anything yet. A Regional Equipment Manager or your Facility Administrator needs to assign you a role and facility — ask them once you've signed up.</div>
           </div></div>
           <div class="timeline-item"><div class="timeline-dot"></div><div class="timeline-body">
             <div class="t1">Every equipment record has a QR code</div>
@@ -1726,13 +1729,13 @@ function renderHelpBody(myRole){
     `).join('');
   } else if(helpTab === 'sections'){
     const sections = [
-      { icon:'fa-gauge-high', title:'Dashboard', desc:'Your home screen. Shows key stats (total assets, functional vs. faulty, calibration overdue), condition and calibration charts, and a "Needs Attention" list of equipment with problems. Regional Administrators and Directors see the whole region; everyone else sees their own facility.' },
-      { icon:'fa-hospital', title:'Facilities', desc:'Regional Administrators and Directors only. Lists every facility in the region with a quick health snapshot. Click one to see its full dashboard. Administrators can add, edit, or delete facilities from here.' },
-      { icon:'fa-kit-medical', title:'Equipment', desc:'The full equipment register: search, filter, and sort every asset. Click any item to see its full profile across five tabs — Overview, Maintenance History, Calibration History, Documents, and QR Code. Facility Administrators can add, edit, delete, import from Excel, or export the register.' },
+      { icon:'fa-gauge-high', title:'Dashboard', desc:'Your home screen. Shows key stats (total equipment, functional vs. faulty, calibration overdue), condition and calibration charts, and a "Needs Attention" list of equipment with problems. Regional Equipment Managers and Directors see the whole region; everyone else sees their own facility.' },
+      { icon:'fa-hospital', title:'Facilities', desc:'Regional Equipment Managers and Directors only. Lists every facility in the region with a quick health snapshot. Click one to see its full dashboard. Administrators can add, edit, or delete facilities from here.' },
+      { icon:'fa-kit-medical', title:'Equipment', desc:'The full equipment register: search, filter, and sort every equipment record. Click any item to see its full profile across five tabs — Overview, Maintenance History, Calibration History, Documents, and QR Code. Facility Administrators and Biomedical Engineers can add and edit equipment (Facility Administrators can also delete, import from Excel, or export the register).' },
       { icon:'fa-screwdriver-wrench', title:'Maintenance', desc:'A kanban board tracking every repair ticket through Reported → Assigned → Repairing → Completed → Closed. Facility Administrators and Engineers can report issues and update tickets; Engineers only see full edit access on tickets assigned to them.' },
-      { icon:'fa-truck-fast', title:'Transfers', desc:'Request equipment be moved from one facility to another. Facility Administrators submit requests; Regional Administrators approve or reject them, which automatically relocates the asset; the receiving facility confirms once it physically arrives.' },
-      { icon:'fa-file-lines', title:'Reports', desc:'Export or print the Equipment Register, a Maintenance Report (repair frequency and cost), and — for Regional Administrators and Directors — a Regional Facility Comparison.' },
-      { icon:'fa-users-gear', title:'Users', desc:'Manage who has access. Regional Administrators and Facility Administrators can assign roles and facilities; Regional Directors can view the list but not make changes.' },
+      { icon:'fa-truck-fast', title:'Transfers', desc:'Request equipment be moved from one facility to another. Facility Administrators submit requests; Regional Equipment Managers approve or reject them, which automatically relocates the equipment; the receiving facility confirms once it physically arrives.' },
+      { icon:'fa-file-lines', title:'Reports', desc:'Export or print the Equipment Register, a Maintenance Report (repair frequency and cost), and — for Regional Equipment Managers and Directors — a Regional Facility Comparison.' },
+      { icon:'fa-users-gear', title:'Users', desc:'Manage who has access. Regional Equipment Managers and Facility Administrators can assign roles and facilities; Regional Directors can view the list but not make changes.' },
       { icon:'fa-gear', title:'Settings', desc:'Update your display name or change your password.' },
       { icon:'fa-arrow-up-right-from-square', title:'CEU Dashboard (Fault Reporting, Installation Request, Equipment Request)', desc:'Three links at the bottom of the sidebar that open the region\'s public equipment-request site in a new tab — for reporting a fault, requesting installation/training on new equipment, or requesting equipment your facility needs. That site is separate from this app and needs no login of its own.' }
     ];
@@ -1749,7 +1752,7 @@ function renderHelpBody(myRole){
       { q:'What\'s the difference between "Functional but Not in Use", "Needs Repair", and "Obsolete"?', a:'These are equipment condition options for anything that isn\'t simply working or broken: "Functional but Not in Use" is working but idle, "Needs Repair" is a known problem not yet critical, and "Obsolete" flags equipment for eventual retirement. All three show up wherever condition is tracked, and "Needs Repair" and "Obsolete" also surface on the "Needs Attention" list.' },
       { q:'How do I add a lot of equipment at once instead of one at a time?', a:'On the Equipment page, Facility Administrators can click "Template" to download a correctly-formatted spreadsheet, fill it in, then click "Import from Excel" to upload it. You\'ll see a preview of what will be added or updated before anything is saved.' },
       { q:'What does the QR code on an equipment page actually do?', a:'It\'s a direct link to that equipment\'s profile page. Print it and attach it to the physical device — anyone who scans it later (and signs in, if they aren\'t already) lands straight on that equipment\'s record.' },
-      { q:'Why can\'t I see equipment from another facility?', a:'By design — each facility\'s data is only visible to its own staff, plus Regional Administrators and Regional Directors who oversee the whole region. This keeps each facility\'s register private to the people responsible for it.' },
+      { q:'Why can\'t I see equipment from another facility?', a:'By design — each facility\'s data is only visible to its own staff, plus Regional Equipment Managers and Regional Directors who oversee the whole region. This keeps each facility\'s register private to the people responsible for it.' },
       { q:'What are the Fault Reporting / Installation Request / Equipment Request links at the bottom of the sidebar?', a:'These open the region\'s public-facing CEU Dashboard in a new tab — a separate tool for submitting a fault report, requesting installation/training on new equipment, or requesting equipment. It doesn\'t need its own login, but you do need to be signed in here first to see the links.' }
     ];
     body.innerHTML = faqs.map((f,i) => `
