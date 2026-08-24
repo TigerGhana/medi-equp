@@ -23,7 +23,7 @@ var CAL_STATUS_OPTIONS = ['PASSED CALIBRATION','NOT CALIBRATED','OUT OF CALIBRAT
 var PRIORITY_OPTIONS = ['low','medium','high','critical'];
 var MAINT_STATUS_OPTIONS = ['reported','assigned','repairing','completed','closed'];
 var ROLE_OPTIONS = ['viewer','engineer','facility_admin','regional_director','regional_admin'];
-var ROLE_LABELS = { regional_admin:'Regional Administrator', regional_director:'Regional Director', facility_admin:'Facility Administrator', engineer:'Biomedical Engineer', viewer:'Viewer' };
+var ROLE_LABELS = { regional_admin:'Regional Equipment Manager', regional_director:'Regional Director', facility_admin:'Facility Administrator', engineer:'Biomedical Engineer', viewer:'Viewer' };
 var DOC_TYPES = ['Manual','Certificate','Warranty','Photo','Other'];
 
 window.APP = window.APP || {};
@@ -248,18 +248,19 @@ function isRegionalDirector(){ return STATE.profile && STATE.profile.role === 'r
 function isFacilityAdmin(){ return STATE.profile && STATE.profile.role === 'facility_admin'; }
 function isEngineer(){ return STATE.profile && STATE.profile.role === 'engineer'; }
 // "Scoped" = sees region-wide data (dashboards, facility lists, cross-facility
-// equipment/maintenance/transfers) -- true for both Regional Administrator and
+// equipment/maintenance/transfers) -- true for both Regional Equipment Manager and
 // Regional Director. Everything that actually WRITES data stays gated to
 // isRegionalAdmin() alone -- Director is strictly view-only.
 function isRegionalScoped(){ return isRegionalAdmin() || isRegionalDirector(); }
-function canEditEquipment(){ return isFacilityAdmin(); }
+function canEditEquipment(){ return isFacilityAdmin() || isEngineer(); }
+function canDeleteEquipment(){ return isFacilityAdmin(); }
 function canEditMaintenance(){ return isFacilityAdmin() || isEngineer(); }
 function canManageUsers(){ return isFacilityAdmin() || isRegionalAdmin(); }
 function canApproveTransfers(){ return isRegionalAdmin(); }
 function canRequestTransfers(){ return isFacilityAdmin(); }
 APP.isRegionalAdmin=isRegionalAdmin; APP.isRegionalDirector=isRegionalDirector; APP.isRegionalScoped=isRegionalScoped;
 APP.isFacilityAdmin=isFacilityAdmin; APP.isEngineer=isEngineer;
-APP.canEditEquipment=canEditEquipment; APP.canEditMaintenance=canEditMaintenance;
+APP.canEditEquipment=canEditEquipment; APP.canDeleteEquipment=canDeleteEquipment; APP.canEditMaintenance=canEditMaintenance;
 APP.canManageUsers=canManageUsers; APP.canApproveTransfers=canApproveTransfers; APP.canRequestTransfers=canRequestTransfers;
 
 // Equipment visible to the signed-in user given their role/scope (RLS already
@@ -480,7 +481,7 @@ var ROUTES = [
   { hash:'facilities', label:'Facilities', icon:'fa-hospital', crumb:'Regional', regionalOnly:true },
   { hash:'equipment', label:'Equipment', icon:'fa-kit-medical', crumb:'Inventory' },
   { hash:'maintenance', label:'Maintenance', icon:'fa-screwdriver-wrench', crumb:'Workflow' },
-  { hash:'transfers', label:'Transfers', icon:'fa-truck-fast', crumb:'Asset Movement', hideFor:['viewer','engineer'] },
+  { hash:'transfers', label:'Transfers', icon:'fa-truck-fast', crumb:'Equipment Movement', hideFor:['viewer','engineer'] },
   { hash:'reports', label:'Reports', icon:'fa-file-lines', crumb:'Analytics', hideFor:['viewer','engineer'] },
   { hash:'users', label:'Users', icon:'fa-users-gear', crumb:'Administration', hideFor:['viewer','engineer'] },
   { hash:'settings', label:'Settings', icon:'fa-gear', crumb:'Account' }
