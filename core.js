@@ -22,8 +22,8 @@ var CONDITION_OPTIONS = ['FUNCTIONAL','FUNCTIONAL BUT NOT IN USE','NEEDS REPAIR'
 var CAL_STATUS_OPTIONS = ['PASSED CALIBRATION','NOT CALIBRATED','OUT OF CALIBRATION','Not Applicable','Not Specified'];
 var PRIORITY_OPTIONS = ['low','medium','high','critical'];
 var MAINT_STATUS_OPTIONS = ['reported','assigned','repairing','completed','closed'];
-var ROLE_OPTIONS = ['viewer','engineer','facility_admin','regional_director','regional_admin'];
-var ROLE_LABELS = { regional_admin:'Regional Equipment Manager', regional_director:'Regional Director', facility_admin:'Facility Administrator', engineer:'Biomedical Engineer', viewer:'Viewer' };
+var ROLE_OPTIONS = ['viewer','engineer','facility_director','facility_admin','regional_director','regional_admin'];
+var ROLE_LABELS = { regional_admin:'Regional Equipment Manager', regional_director:'Regional Director', facility_admin:'Facility Administrator', facility_director:'Facility Director', engineer:'Biomedical Engineer', viewer:'Viewer' };
 var DOC_TYPES = ['Manual','Certificate','Warranty','Photo','Other'];
 
 window.APP = window.APP || {};
@@ -246,6 +246,7 @@ APP.conditionPillClass=conditionPillClass; APP.calPillClass=calPillClass; APP.pr
 function isRegionalAdmin(){ return STATE.profile && STATE.profile.role === 'regional_admin'; }
 function isRegionalDirector(){ return STATE.profile && STATE.profile.role === 'regional_director'; }
 function isFacilityAdmin(){ return STATE.profile && STATE.profile.role === 'facility_admin'; }
+function isFacilityDirector(){ return STATE.profile && STATE.profile.role === 'facility_director'; }
 function isEngineer(){ return STATE.profile && STATE.profile.role === 'engineer'; }
 // "Scoped" = sees region-wide data (dashboards, facility lists, cross-facility
 // equipment/maintenance/transfers) -- true for both Regional Equipment Manager and
@@ -259,7 +260,7 @@ function canManageUsers(){ return isFacilityAdmin() || isRegionalAdmin(); }
 function canApproveTransfers(){ return isRegionalAdmin(); }
 function canRequestTransfers(){ return isFacilityAdmin(); }
 APP.isRegionalAdmin=isRegionalAdmin; APP.isRegionalDirector=isRegionalDirector; APP.isRegionalScoped=isRegionalScoped;
-APP.isFacilityAdmin=isFacilityAdmin; APP.isEngineer=isEngineer;
+APP.isFacilityAdmin=isFacilityAdmin; APP.isFacilityDirector=isFacilityDirector; APP.isEngineer=isEngineer;
 APP.canEditEquipment=canEditEquipment; APP.canDeleteEquipment=canDeleteEquipment; APP.canEditMaintenance=canEditMaintenance;
 APP.canManageUsers=canManageUsers; APP.canApproveTransfers=canApproveTransfers; APP.canRequestTransfers=canRequestTransfers;
 
