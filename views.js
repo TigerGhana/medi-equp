@@ -9,7 +9,7 @@ const { STATE, esc, dash, setText, qs, fmtDate, fmtDateTime, isOverdue, needsAtt
   conditionPillClass, calPillClass, priorityPillClass, statusPillClass,
   facilityById, facilityName, equipmentById, userById, userName, categoryName,
   CONDITION_OPTIONS, CAL_STATUS_OPTIONS, PRIORITY_OPTIONS, MAINT_STATUS_OPTIONS, ROLE_OPTIONS, ROLE_LABELS, DOC_TYPES,
-  isRegionalAdmin, isRegionalDirector, isRegionalScoped, isFacilityAdmin, isEngineer, canEditEquipment, canDeleteEquipment, canEditMaintenance, canManageUsers,
+  isRegionalAdmin, isRegionalDirector, isRegionalScoped, isFacilityAdmin, isFacilityDirector, isEngineer, canEditEquipment, canDeleteEquipment, canEditMaintenance, canManageUsers,
   canApproveTransfers, canRequestTransfers, openModal, closeModal, showError, showInfo, describeError, sb } = APP;
 
 let currentView = { name: 'dashboard', param: null };
@@ -1579,7 +1579,7 @@ function renderUsers(){
 }
 
 function openUserForm(u){
-  const assignableRoles = isRegionalAdmin() ? ROLE_OPTIONS : ['viewer','engineer','facility_admin'];
+  const assignableRoles = isRegionalAdmin() ? ROLE_OPTIONS : ['viewer','engineer','facility_director','facility_admin'];
   const facilityOptions = isRegionalAdmin() ? STATE.facilities : STATE.facilities.filter(f => f.id === STATE.profile.facilityId);
   const body = `
     <div class="form-grid">
@@ -1639,8 +1639,12 @@ var ROLE_SUMMARIES = [
     cannot:['Add, edit, or delete anything — facilities, equipment, users, tickets, or transfers','Approve transfers or manage users','Change their own role (only a Regional Equipment Manager can add, edit, or remove a Director)'] },
   { role:'facility_admin', title:'Facility Administrator', icon:'fa-hospital-user', pill:'warn',
     blurb:'Runs the day-to-day equipment register for their own facility.',
-    can:['Add, edit, and delete equipment at their facility','Import equipment in bulk from an Excel spreadsheet, or export the current register','Report and manage maintenance tickets, and assign them to engineers','Add calibration records and upload documents (manuals, certificates, warranties, photos)','Request equipment transfers to other facilities','Add, edit, and deactivate Viewer, Engineer, and Facility Administrator accounts at their own facility'],
+    can:['Add, edit, and delete equipment at their facility','Import equipment in bulk from an Excel spreadsheet, or export the current register','Report and manage maintenance tickets, and assign them to engineers','Add calibration records and upload documents (manuals, certificates, warranties, photos)','Request equipment transfers to other facilities','Add, edit, and deactivate Viewer, Engineer, Facility Director, and Facility Administrator accounts at their own facility'],
     cannot:['See or act on other facilities\' data','Promote anyone to Regional Equipment Manager or Regional Director'] },
+  { role:'facility_director', title:'Facility Director', icon:'fa-building-shield', pill:'info',
+    blurb:'Sees everything at their own facility — the facility-level equivalent of a Regional Director. Strictly read-only.',
+    can:['View their facility\'s equipment, maintenance tickets, transfers, and staff list','Export and print reports covering their facility'],
+    cannot:['Add, edit, or delete anything — equipment, tickets, transfers, or user accounts','Manage users or approve transfers','Change their own role (only a Facility Administrator or Regional Equipment Manager can add, edit, or remove a Facility Director)'] },
   { role:'engineer', title:'Biomedical Engineer', icon:'fa-screwdriver-wrench', pill:'neutral',
     blurb:'Handles hands-on maintenance, equipment condition, and commissioning new equipment at their facility.',
     can:['View their facility\'s equipment and maintenance tickets','Add new equipment records at their facility','Update equipment condition and calibration status','Update maintenance tickets that are assigned to them, add notes and repair cost','Add calibration records and upload documents'],
@@ -1735,7 +1739,7 @@ function renderHelpBody(myRole){
       { icon:'fa-screwdriver-wrench', title:'Maintenance', desc:'A kanban board tracking every repair ticket through Reported → Assigned → Repairing → Completed → Closed. Facility Administrators and Engineers can report issues and update tickets; Engineers only see full edit access on tickets assigned to them.' },
       { icon:'fa-truck-fast', title:'Transfers', desc:'Request equipment be moved from one facility to another. Facility Administrators submit requests; Regional Equipment Managers approve or reject them, which automatically relocates the equipment; the receiving facility confirms once it physically arrives.' },
       { icon:'fa-file-lines', title:'Reports', desc:'Export or print the Equipment Register, a Maintenance Report (repair frequency and cost), and — for Regional Equipment Managers and Directors — a Regional Facility Comparison.' },
-      { icon:'fa-users-gear', title:'Users', desc:'Manage who has access. Regional Equipment Managers and Facility Administrators can assign roles and facilities; Regional Directors can view the list but not make changes.' },
+      { icon:'fa-users-gear', title:'Users', desc:'Manage who has access. Regional Equipment Managers and Facility Administrators can assign roles and facilities; Regional Directors and Facility Directors can view the list but not make changes.' },
       { icon:'fa-gear', title:'Settings', desc:'Update your display name or change your password.' },
       { icon:'fa-arrow-up-right-from-square', title:'CEU Dashboard (Fault Reporting, Installation Request, Equipment Request)', desc:'Three links at the bottom of the sidebar that open the region\'s public equipment-request site in a new tab — for reporting a fault, requesting installation/training on new equipment, or requesting equipment your facility needs. That site is separate from this app and needs no login of its own.' }
     ];
