@@ -671,6 +671,18 @@ const IMPORT_COLUMNS = [
 const IMPORT_DATE_FIELDS = ['installDate','warrantyExpiry','nextCalibration'];
 const IMPORT_TEXT_FORCE_FIELDS = ['assetCode','serial']; // identifier columns Excel might otherwise auto-convert to numbers
 
+// Maps a normalized (trimmed, uppercased) spelling back to the exact canonical
+// value -- so "functional", "Functional ", "FUNCTIONAL" all resolve to the one
+// true "FUNCTIONAL", while a genuine typo like "function" matches nothing and
+// still correctly fails validation. Built once, not per-row.
+function buildNormalizedLookup(options){
+  const map = {};
+  options.forEach(opt => { map[opt.trim().toUpperCase()] = opt; });
+  return map;
+}
+const CONDITION_LOOKUP = buildNormalizedLookup(CONDITION_OPTIONS);
+const CAL_STATUS_LOOKUP = buildNormalizedLookup(CAL_STATUS_OPTIONS);
+
 function excelDateToISO(v){
   if(v === null || v === undefined || v === '') return '';
   if(v instanceof Date){
@@ -706,8 +718,26 @@ function downloadImportTemplate(){
   });
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, 'Equipment Import');
+
+  // Second sheet: exact accepted spellings to copy from, so nobody has to
+  // guess or retype from memory. Doesn't force correctness the way a real
+  // in-cell dropdown would, but it's 100% reliable across every version of
+  // Excel/Sheets, which isn't something a forced dropdown could guarantee
+  // with the spreadsheet library this app uses.
+  const maxLen = Math.max(CONDITION_OPTIONS.length, CAL_STATUS_OPTIONS.length);
+  const refRows = [];
+  for(let i = 0; i < maxLen; i++){
+    refRows.push({
+      'Valid Condition Values (copy exactly)': CONDITION_OPTIONS[i] || '',
+      'Valid Calibration Status Values (copy exactly)': CAL_STATUS_OPTIONS[i] || ''
+    });
+  }
+  const refWs = XLSX.utils.json_to_sheet(refRows);
+  refWs['!cols'] = [{ wch: 32 }, { wch: 34 }];
+  XLSX.utils.book_append_sheet(wb, refWs, 'Valid Values');
+
   XLSX.writeFile(wb, 'Equipment_Import_Template.xlsx');
-  showInfo('Template downloaded — fill it in and use "Import from Excel" to upload it.');
+  showInfo('Template downloaded — check the "Valid Values" tab for exact accepted spellings, then use "Import from Excel" to upload it.');
 }
 
 function handleImportFileSelected(e){
@@ -759,6 +789,18 @@ function processImportRows(rawRows){
     });
 
     const errs = [];
+    // Normalize case/whitespace variations of a CORRECT value (e.g. "functional",
+    // "Functional ") back to the exact canonical spelling before validating --
+    // a genuine typo like "function" won't match anything here and still
+    // correctly fails the check below.
+    if(rec.condition){
+      const normalized = CONDITION_LOOKUP[rec.condition.toUpperCase()];
+      if(normalized) rec.condition = normalized;
+    }
+    if(rec.calibrationStatus){
+      const normalized = CAL_STATUS_LOOKUP[rec.calibrationStatus.toUpperCase()];
+      if(normalized) rec.calibrationStatus = normalized;
+    }
     if(!rec.name) errs.push('Equipment Name is required');
     if(!rec.assetCode) errs.push('Equipment Code is required');
     if(rec.condition && !CONDITION_OPTIONS.includes(rec.condition)) errs.push(`Condition must be one of: ${CONDITION_OPTIONS.join(', ')}`);
@@ -808,7 +850,7 @@ function renderEquipmentImportPreview(){
       ${p.invalid.slice(0,50).map(r => `<div style="margin-bottom:6px;"><strong>Row ${r.rowNum}</strong> (${esc(r.name)}): ${esc(r.errors.join('; '))}</div>`).join('')}
       ${p.invalid.length > 50 ? `<div>...and ${p.invalid.length - 50} more</div>` : ''}
     </div>` : ''}
-    <p style="font-size:12px; color:var(--muted-2); margin:0 0 16px;">Matched to existing equipment by <strong>Equipment Code</strong> within your facility. Unmatched codes will be added as new records. Unknown Category names are imported without a category rather than rejected.</p>
+    <p style="font-size:12px; color:var(--muted-2); margin:0 0 16px;">Matched to existing equipment by <strong>Equipment Code</strong> within your facility. Unmatched codes will be added as new records. Unknown Category names are imported without a category rather than rejected. Condition and Calibration Status are matched regardless of case or extra spaces (e.g. "functional" is accepted as FUNCTIONAL) — but a genuinely different word is still rejected.</p>
     <div class="modal-actions"><div class="left"></div><div class="right">
       <button class="btn-secondary" id="eqImportCancel">Cancel</button>
       <button class="btn-primary" id="eqImportConfirm" style="width:auto;" ${totalValid===0?'disabled':''}>Import ${totalValid} row${totalValid===1?'':'s'}</button>
