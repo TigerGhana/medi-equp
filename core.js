@@ -287,6 +287,7 @@ document.addEventListener('DOMContentLoaded', function(){
       qs('signupFields').style.display = authMode === 'signup' ? 'block' : 'none';
       qs('authTitle').textContent = authMode === 'signin' ? 'Sign in' : 'Create account';
       hideAuthError(); hideAuthInfo();
+      qs('suPasswordMismatch').classList.remove('show');
     });
   });
   qs('btnSignIn').addEventListener('click', doSignIn);
@@ -294,6 +295,24 @@ document.addEventListener('DOMContentLoaded', function(){
   qs('btnForgotPw').addEventListener('click', doForgotPassword);
   qs('siPassword').addEventListener('keydown', function(e){ if(e.key==='Enter') doSignIn(); });
   qs('suPassword').addEventListener('keydown', function(e){ if(e.key==='Enter') doSignUp(); });
+  qs('suPasswordConfirm').addEventListener('keydown', function(e){ if(e.key==='Enter') doSignUp(); });
+  document.querySelectorAll('.password-toggle').forEach(function(btn){
+    btn.addEventListener('click', function(){
+      var input = qs(btn.getAttribute('data-target'));
+      var icon = btn.querySelector('i');
+      var showing = input.type === 'text';
+      input.type = showing ? 'password' : 'text';
+      icon.className = showing ? 'fa-solid fa-eye' : 'fa-solid fa-eye-slash';
+      btn.setAttribute('aria-label', showing ? 'Show password' : 'Hide password');
+    });
+  });
+  function checkPasswordsMatch(){
+    var pw = qs('suPassword').value, confirm = qs('suPasswordConfirm').value;
+    var mismatchEl = qs('suPasswordMismatch');
+    mismatchEl.classList.toggle('show', confirm.length > 0 && pw !== confirm);
+  }
+  qs('suPassword').addEventListener('input', checkPasswordsMatch);
+  qs('suPasswordConfirm').addEventListener('input', checkPasswordsMatch);
   qs('btnSignOut').addEventListener('click', doSignOut);
   qs('sidebarToggle').addEventListener('click', function(){ qs('sidebar').classList.toggle('open'); });
 });
@@ -320,9 +339,10 @@ async function doSignIn(){
 }
 async function doSignUp(){
   hideAuthError(); hideAuthInfo();
-  var name = qs('suName').value.trim(), email = qs('suEmail').value.trim(), password = qs('suPassword').value;
-  if(!name || !email || !password){ showAuthError('Fill in your name, email and a password.'); return; }
+  var name = qs('suName').value.trim(), email = qs('suEmail').value.trim(), password = qs('suPassword').value, confirmPassword = qs('suPasswordConfirm').value;
+  if(!name || !email || !password || !confirmPassword){ showAuthError('Fill in your name, email, and password (both fields).'); return; }
   if(password.length < 8){ showAuthError('Password must be at least 8 characters.'); return; }
+  if(password !== confirmPassword){ showAuthError('Those two passwords don\'t match — please re-check them.'); return; }
   var btn = qs('btnSignUp'); btn.disabled = true; btn.textContent = 'Creating account…';
   try{
     var res = await sb.auth.signUp({ email: email, password: password, options: { data: { name: name } } });
