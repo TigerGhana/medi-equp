@@ -1702,7 +1702,7 @@ function renderHelp(){
   const myRole = STATE.profile.role;
   mainEl().innerHTML = `
     <div class="section-head">
-      <h2>How to Use This Platform</h2>
+      <h2>How to use this dashboad</h2>
       <span class="hint">You're signed in as ${esc(ROLE_LABELS[myRole]||myRole)}</span>
     </div>
     <div class="tabs">
@@ -1724,28 +1724,28 @@ function renderHelpBody(myRole){
   if(helpTab === 'start'){
     body.innerHTML = `
       <div class="panel" style="margin-bottom:16px;">
-        <h3>What is the CEU Regional Platform?</h3>
+        <h3>What is this Medical Equipment Management System about?</h3>
         <p style="font-size:13.5px; color:var(--muted); line-height:1.6; margin:0;">
           This is the Western Region Health Directorate's clinical engineering equipment management system.
-          It tracks medical equipment across every facility in the region — condition, calibration status,
-          maintenance history, and equipment transfers — from one place, with each facility responsible for its own
-          register and the region able to see the full picture.
+          It tracks major medical equipment across facilities in the region — functional status, calibration status,
+          maintenance history, and equipment transfers, reporting equipment faults, submitting request for medical equipment, installationa and user training request — from one place, with each facility responsible for its own
+          inventory and the Regional Health Directorate able to see the full picture. There are four (4) main tabs- Getting Started (current tab), Roles  & Permissions, App Sections and  FAQ. Kindly check all these to be familiar with this system. 
         </p>
       </div>
       <div class="panel">
         <h3>Three things to know before you start</h3>
         <div class="timeline">
           <div class="timeline-item"><div class="timeline-dot"></div><div class="timeline-body">
-            <div class="t1">New accounts start as read-only Viewers</div>
-            <div class="t2">When you first create an account, you can sign in but can't change anything yet. A Regional Equipment Manager or your Facility Administrator needs to assign you a role and facility — ask them once you've signed up.</div>
+            <div class="t1">New accounts start as Viewers</div>
+            <div class="t2">When you first create an account using your email and a password you can remember, you can sign in but can't change anything yet. A Regional Equipment Manager or your Facility Administrator of the system needs to assign you a role and facility — ask them once you've signed up. You can contact the Regional Equipment Manager on 0506971001 for further details.</div>
           </div></div>
           <div class="timeline-item"><div class="timeline-dot"></div><div class="timeline-body">
             <div class="t1">Every equipment record has a QR code</div>
             <div class="t2">Open any piece of equipment and check its "QR Code" tab. Print it and stick it on the physical device — scanning it later opens that exact equipment profile (you'll need to sign in first if you aren't already).</div>
           </div></div>
           <div class="timeline-item"><div class="timeline-dot"></div><div class="timeline-body">
-            <div class="t1">Password resets aren't self-service yet</div>
-            <div class="t2">If you forget your password, contact your Regional or Facility Administrator directly — they can reset it for you right away.</div>
+            <div class="t1">Password resets</div>
+            <div class="t2">It is recommended that you use a secured password you can always remember. However, if you forget your password, contact your Facility Administrator or the Regional Equipment 0n 0506971001 — they can reset it for you.</div>
           </div></div>
         </div>
       </div>
@@ -1793,13 +1793,13 @@ function renderHelpBody(myRole){
     `).join('');
   } else if(helpTab === 'faq'){
     const faqs = [
-      { q:'I just signed up and can\'t do anything — is that a bug?', a:'No — every new account starts as a read-only Viewer with no facility assigned, on purpose. Ask your Regional or Facility Administrator to assign your role and facility in the Users section, and you\'ll get access right away.' },
-      { q:'I forgot my password — what do I do?', a:'Password resets aren\'t self-service yet. Contact your Regional or Facility Administrator and they can reset it for you directly, no email required.' },
+      { q:'I just signed up and can\'t do anything — is that an error?', a:'No — every new account starts as a read-only Viewer with no facility assigned, on purpose. Ask your Regional or Facility Administrator to assign your role and facility in the Users section, and you\'ll get access right away.' },
+      { q:'I forgot my password — what do I do?', a:'Password resets aren\'t self-service yet. Contact your Regional or Facility Administrator and they can reset it for you directly.' },
       { q:'What\'s the difference between "Functional but Not in Use", "Needs Repair", and "Obsolete"?', a:'These are equipment condition options for anything that isn\'t simply working or broken: "Functional but Not in Use" is working but idle, "Needs Repair" is a known problem not yet critical, and "Obsolete" flags equipment for eventual retirement. All three show up wherever condition is tracked, and "Needs Repair" and "Obsolete" also surface on the "Needs Attention" list.' },
       { q:'How do I add a lot of equipment at once instead of one at a time?', a:'On the Equipment page, Facility Administrators can click "Template" to download a correctly-formatted spreadsheet, fill it in, then click "Import from Excel" to upload it. You\'ll see a preview of what will be added or updated before anything is saved.' },
       { q:'What does the QR code on an equipment page actually do?', a:'It\'s a direct link to that equipment\'s profile page. Print it and attach it to the physical device — anyone who scans it later (and signs in, if they aren\'t already) lands straight on that equipment\'s record.' },
       { q:'Why can\'t I see equipment from another facility?', a:'By design — each facility\'s data is only visible to its own staff, plus Regional Equipment Managers and Regional Directors who oversee the whole region. This keeps each facility\'s register private to the people responsible for it.' },
-      { q:'What are the Fault Reporting / Installation Request / Equipment Request links at the bottom of the sidebar?', a:'These open the region\'s public-facing CEU Dashboard in a new tab — a separate tool for submitting a fault report, requesting installation/training on new equipment, or requesting equipment. It doesn\'t need its own login, but you do need to be signed in here first to see the links.' }
+      { q:'What are the Fault Reporting / Installation Request / Equipment Request links at the bottom of the sidebar?', a:'These open in a new tab — an additional tool for submitting a fault report, requesting installation/training on new equipment, or requesting equipment. It doesn\'t need its own login, but you do need to be signed in here first to see the links.' }
     ];
     body.innerHTML = faqs.map((f,i) => `
       <div class="panel" style="margin-bottom:10px;">
