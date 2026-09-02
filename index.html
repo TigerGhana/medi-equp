@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Western Region Health Directorate- Clinical Engineering Unit</title>
+<title>CEU Regional Platform — Western Region Health Directorate</title>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=DM+Mono:wght@400;500&display=swap');
@@ -140,6 +140,12 @@
   .search-box{ position:relative; flex:1 1 240px; min-width:200px; }
   .search-box input{ width:100%; padding:10px 14px 10px 34px; border:1px solid var(--line); border-radius:8px; font-size:13.5px; font-family:var(--font-body); background:var(--panel); color:var(--ink); }
   .search-box i{ position:absolute; left:12px; top:50%; transform:translateY(-50%); color:var(--muted-2); font-size:13px; }
+  .password-input-wrap{ position:relative; }
+  .password-input-wrap input{ width:100%; padding-right:38px; }
+  .password-toggle{ position:absolute; right:2px; top:50%; transform:translateY(-50%); background:none; border:none; color:var(--muted-2); cursor:pointer; padding:8px 10px; font-size:13.5px; border-radius:6px; }
+  .password-toggle:hover{ color:var(--teal); background:var(--paper); }
+  .password-mismatch{ color:var(--bad); font-size:11.5px; margin-top:4px; display:none; }
+  .password-mismatch.show{ display:block; }
   select, input[type=text], input[type=date], input[type=number], input[type=password], input[type=email], textarea{ padding:10px 12px; border:1px solid var(--line); border-radius:8px; background:var(--panel); font-size:13px; color:var(--ink); font-family:var(--font-body); }
   select{ cursor:pointer; }
   .btn-reset, .btn-secondary{ padding:10px 14px; border:1px solid var(--line); border-radius:8px; background:var(--panel); color:var(--muted); font-size:13px; cursor:pointer; }
@@ -307,21 +313,26 @@
 <div id="authScreen">
   <div class="auth-card">
     <div class="auth-head">
-      <div class="auth-brand"><i class="fa-solid fa-heart-pulse"></i> MEDICAL EQUIPMENT MANAGEMENT PLATFORM</div>
+      <div class="auth-brand"><i class="fa-solid fa-heart-pulse"></i> CEU REGIONAL PLATFORM</div>
       <h1 id="authTitle">Sign in</h1>
       <p>Western Region Health Directorate · Clinical Engineering Unit</p>
     </div>
     <div class="auth-body">
       <div class="auth-tabs">
         <div class="auth-tab active" data-mode="signin">Sign in</div>
-        <div class="auth-tab" data-mode="signup">Create New account</div>
+        <div class="auth-tab" data-mode="signup">Create account</div>
       </div>
       <div class="auth-error" id="authError"></div>
       <div class="auth-info" id="authInfo"></div>
 
       <div id="signinFields">
         <div class="form-field"><label>Email</label><input type="email" id="siEmail" autocomplete="username"></div>
-        <div class="form-field"><label>Password</label><input type="password" id="siPassword" autocomplete="current-password"></div>
+        <div class="form-field"><label>Password</label>
+          <div class="password-input-wrap">
+            <input type="password" id="siPassword" autocomplete="current-password">
+            <button type="button" class="password-toggle" data-target="siPassword" aria-label="Show password"><i class="fa-solid fa-eye"></i></button>
+          </div>
+        </div>
         <button class="btn-primary" id="btnSignIn">Sign in</button>
         <div class="auth-foot"><button id="btnForgotPw">Forgot your password?</button></div>
       </div>
@@ -329,7 +340,19 @@
       <div id="signupFields" style="display:none;">
         <div class="form-field"><label>Full name</label><input type="text" id="suName" autocomplete="name"></div>
         <div class="form-field"><label>Email</label><input type="email" id="suEmail" autocomplete="username"></div>
-        <div class="form-field"><label>Password (min. 8 characters)</label><input type="password" id="suPassword" autocomplete="new-password"></div>
+        <div class="form-field"><label>Password (min. 8 characters)</label>
+          <div class="password-input-wrap">
+            <input type="password" id="suPassword" autocomplete="new-password">
+            <button type="button" class="password-toggle" data-target="suPassword" aria-label="Show password"><i class="fa-solid fa-eye"></i></button>
+          </div>
+        </div>
+        <div class="form-field"><label>Confirm password</label>
+          <div class="password-input-wrap">
+            <input type="password" id="suPasswordConfirm" autocomplete="new-password">
+            <button type="button" class="password-toggle" data-target="suPasswordConfirm" aria-label="Show password"><i class="fa-solid fa-eye"></i></button>
+          </div>
+          <div class="password-mismatch" id="suPasswordMismatch">Passwords don't match yet.</div>
+        </div>
         <button class="btn-primary" id="btnSignUp">Create account</button>
         <div class="role-note"><i class="fa-solid fa-circle-info"></i>&nbsp; New accounts start as read-only <strong>Viewers</strong>. A Regional or Facility Administrator must assign your facility and role before you get edit access.</div>
       </div>
@@ -343,7 +366,7 @@
   <aside class="sidebar" id="sidebar">
     <div class="sidebar-brand">
       <i class="fa-solid fa-heart-pulse"></i>
-      <div class="txt">MEDICAL EQUIPMENT<small>Management System</small></div>
+      <div class="txt">CEU Regional Platform<small>Clinical Engineering</small></div>
     </div>
     <div class="sidebar-scope">
       <span id="scopeLabel">Scope</span>
@@ -362,7 +385,7 @@
   <div class="main-col">
     <div class="topbar">
       <div>
-        <div class="crumb" id="crumbLabel">FACILITY EQUIPMENT OVERVIEW</div>
+        <div class="crumb" id="crumbLabel">Overview</div>
         <h1 id="pageTitle">Dashboard</h1>
       </div>
       <div class="conn-pill"><span class="conn-dot connecting" id="connDot"></span><span id="connLabel">Connecting…</span></div>
@@ -380,8 +403,8 @@
       <div id="mainContent"></div>
 
       <div class="page-footer">
-        <span>Western Regional Platform · Ghana Health Service</span>
-        <span>Managed by the Clinical Engineering Unit · Realtime sync enabled</span>
+        <span>CEU Regional Platform · Western Region Health Directorate</span>
+        <span>Backend: Supabase (Postgres + RLS) · Realtime sync enabled</span>
       </div>
     </div>
   </div>
