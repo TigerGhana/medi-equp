@@ -9,16 +9,23 @@ name: Supabase Keep-Alive
 # Setup (one-time):
 #   1. In this repo: Settings -> Secrets and variables -> Actions -> New
 #      repository secret.
-#   2. Name:  SUPABASE_ANON_KEY
-#      Value: the anon/public key from Supabase -> Project Settings -> API.
-#      (This key is DESIGNED to be public -- it's the same one already
-#      embedded in core.js -- but using a secret here keeps this workflow
-#      file portable and avoids hardcoding it in two places.)
+#   2. Name:  SUPABASE_ANON_KEY   (must match exactly, case-sensitive)
+#      Value: ONLY the raw anon key string itself -- nothing else. Copy it
+#      fresh from Supabase -> Project Settings -> API -> "anon" "public" key
+#      (NOT from core.js -- copying from the file risks grabbing the
+#      surrounding quote marks, semicolon, or other file content along
+#      with it, which breaks this workflow). The value should start with
+#      "eyJ" and contain no quotes, no spaces, no line breaks -- just the
+#      key, pasted directly from Supabase's own "copy" button.
 #   3. Commit this file. It will run automatically from then on.
 #   4. To confirm it works right now rather than waiting for 03:00 UTC:
 #      go to the "Actions" tab -> "Supabase Keep-Alive" -> "Run workflow".
+#      Check the "Verify secret is configured" step's output first -- it
+#      prints the key's length and first few characters (safe to show;
+#      not enough to reconstruct the real key) so a wrong paste is obvious
+#      immediately, before the actual ping even runs.
 
-on:
+"on":
   schedule:
     - cron: '0 3 * * *'   # daily at 03:00 UTC
   workflow_dispatch: {}    # lets you trigger it manually to test
@@ -26,15 +33,35 @@ on:
 jobs:
   ping:
     runs-on: ubuntu-latest
+    env:
+      # Passed via env:, not inline ${{ }} interpolation in the shell script --
+      # the safer pattern. Inline interpolation can break (or worse, silently
+      # produce a broken command) if the secret's value happens to contain
+      # quote marks, newlines, or other shell-special characters -- exactly
+      # what pasting a whole source file into the secret would do.
+      SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
     steps:
+      - name: Verify secret is configured
+        run: |
+          if [ -z "$SUPABASE_ANON_KEY" ]; then
+            echo "::error::SUPABASE_ANON_KEY secret is empty or not set. Add it under Settings -> Secrets and variables -> Actions."
+            exit 1
+          fi
+          echo "Secret length: ${#SUPABASE_ANON_KEY} characters"
+          echo "First 6 characters: ${SUPABASE_ANON_KEY:0:6}"
+          echo "(A correct Supabase anon key is a long JWT starting with 'eyJ' and is roughly 200+ characters. If the length above looks way too long, or the first characters aren't 'eyJ', the wrong value was pasted into the secret.)"
+
       - name: Ping Supabase REST API
         run: |
-          response=$(curl -s -o /dev/null -w "%{http_code}" \
+          response=$(curl -s -o /tmp/response_body.txt -w "%{http_code}" \
             "https://xxfvxrzcgowpkcfrvcyd.supabase.co/rest/v1/regions?select=id&limit=1" \
-            -H "apikey: ${{ secrets.SUPABASE_ANON_KEY }}")
-          echo "Response code: $response"
-          if [ "$response" -ne 200 ]; then
-            echo "::error::Keep-alive ping failed with HTTP status $response -- check the project isn't already paused, or that the secret is set correctly."
+            -H "apikey: $SUPABASE_ANON_KEY")
+          echo "HTTP status: $response"
+          echo "Response body:"
+          cat /tmp/response_body.txt
+          echo ""
+          if [ "$response" != "200" ]; then
+            echo "::error::Keep-alive ping failed with HTTP status '$response' -- see the response body above for the actual reason Supabase gave."
             exit 1
           fi
           echo "Keep-alive ping succeeded."
