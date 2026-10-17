@@ -10,20 +10,21 @@ name: Supabase Keep-Alive
 #   1. In this repo: Settings -> Secrets and variables -> Actions -> New
 #      repository secret.
 #   2. Name:  SUPABASE_ANON_KEY   (must match exactly, case-sensitive)
-#      Value: ONLY the raw anon key string itself -- nothing else. Copy it
-#      fresh from Supabase -> Project Settings -> API -> "anon" "public" key
-#      (NOT from core.js -- copying from the file risks grabbing the
-#      surrounding quote marks, semicolon, or other file content along
-#      with it, which breaks this workflow). The value should start with
-#      "eyJ" and contain no quotes, no spaces, no line breaks -- just the
-#      key, pasted directly from Supabase's own "copy" button.
+#      Value: ONLY the raw anon (public) key for the ceu-regional-platform
+#      project -- no quote marks, no spaces, no line breaks. Copy it with the
+#      "copy" button in Supabase -> Project Settings -> API, making sure the
+#      project selector (top left) says ceu-regional-platform first.
 #   3. Commit this file. It will run automatically from then on.
 #   4. To confirm it works right now rather than waiting for 03:00 UTC:
 #      go to the "Actions" tab -> "Supabase Keep-Alive" -> "Run workflow".
-#      Check the "Verify secret is configured" step's output first -- it
-#      prints the key's length and first few characters (safe to show;
-#      not enough to reconstruct the real key) so a wrong paste is obvious
-#      immediately, before the actual ping even runs.
+#
+# The first step reads the project ID stored inside the key itself (it is
+# part of the key's visible contents, not a secret) and compares it to the
+# project this workflow pings. A key copied from a different Supabase
+# project is the one mistake a length check cannot catch, so this does.
+# NOTE: the first/last-characters lines are only safe to print because an
+# anon key is public by design. If this workflow is ever reused with a
+# private key (service_role, database password), delete those two lines.
 
 "on":
   schedule:
@@ -34,27 +35,59 @@ jobs:
   ping:
     runs-on: ubuntu-latest
     env:
+      SUPABASE_PROJECT_REF: xxfvxrzcgowpkcfrvcyd
       # Passed via env:, not inline ${{ }} interpolation in the shell script --
-      # the safer pattern. Inline interpolation can break (or worse, silently
-      # produce a broken command) if the secret's value happens to contain
-      # quote marks, newlines, or other shell-special characters -- exactly
-      # what pasting a whole source file into the secret would do.
+      # the safer pattern, so a secret containing quotes or special characters
+      # cannot corrupt the generated command.
       SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
     steps:
-      - name: Verify secret is configured
+      - name: Verify the key belongs to this project
+        shell: python
         run: |
-          if [ -z "$SUPABASE_ANON_KEY" ]; then
-            echo "::error::SUPABASE_ANON_KEY secret is empty or not set. Add it under Settings -> Secrets and variables -> Actions."
-            exit 1
-          fi
-          echo "Secret length: ${#SUPABASE_ANON_KEY} characters"
-          echo "First 6 characters: ${SUPABASE_ANON_KEY:0:6}"
-          echo "(A correct Supabase anon key is a long JWT starting with 'eyJ' and is roughly 200+ characters. If the length above looks way too long, or the first characters aren't 'eyJ', the wrong value was pasted into the secret.)"
+          import base64, json, os, sys
+
+          key = os.environ.get("SUPABASE_ANON_KEY", "")
+          expected_ref = os.environ["SUPABASE_PROJECT_REF"]
+
+          def fail(message):
+              print("::error::" + message)
+              sys.exit(1)
+
+          if not key:
+              fail("SUPABASE_ANON_KEY secret is empty or not set. Add it under Settings -> Secrets and variables -> Actions.")
+
+          print("Secret length:", len(key), "characters (a correct anon key is 208)")
+          print("First 6 characters:", key[:6])
+          print("Last 6 characters:", key[-6:])
+
+          if any(c in key for c in " \t\r\n\"'"):
+              fail("The secret contains a space, line break, or quote mark. Paste only the key itself, with nothing around it.")
+
+          try:
+              payload = key.split(".")[1]
+              payload += "=" * (-len(payload) % 4)
+              claims = json.loads(base64.urlsafe_b64decode(payload))
+              if not isinstance(claims, dict):
+                  raise ValueError("unexpected contents")
+          except Exception:
+              fail("The secret is not a Supabase JWT key (it should start with 'eyJ' and contain two dots). The newer short 'sb_publishable_...' key will not work here.")
+
+          ref = claims.get("ref")
+          role = claims.get("role")
+          print("Key belongs to project:", ref)
+          print("Key role:", role)
+
+          if ref != expected_ref:
+              fail("This key belongs to a DIFFERENT Supabase project (" + str(ref) + "), not " + expected_ref + ". Open the ceu-regional-platform project in Supabase and copy its anon key from Project Settings -> API.")
+          if role != "anon":
+              fail("This key has the role '" + str(role) + "' but an 'anon' key is needed.")
+
+          print("OK: key matches this project and has the anon role.")
 
       - name: Ping Supabase REST API
         run: |
           response=$(curl -s -o /tmp/response_body.txt -w "%{http_code}" \
-            "https://xxfvxrzcgowpkcfrvcyd.supabase.co/rest/v1/regions?select=id&limit=1" \
+            "https://${SUPABASE_PROJECT_REF}.supabase.co/rest/v1/regions?select=id&limit=1" \
             -H "apikey: $SUPABASE_ANON_KEY")
           echo "HTTP status: $response"
           echo "Response body:"
