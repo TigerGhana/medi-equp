@@ -127,6 +127,7 @@
 
   .panel-grid2{ display:grid; grid-template-columns:1.3fr 1fr; gap:16px; margin-bottom:24px; }
   .panel-grid3{ display:grid; grid-template-columns:1fr 1fr 1fr; gap:16px; margin-bottom:24px; }
+  .panel-grid-half{ display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:24px; }
   .panel{ background:var(--panel); border:1px solid var(--line); border-radius:var(--radius); padding:18px 18px 16px; box-shadow:var(--shadow-sm); }
   .panel h3{ margin:0 0 14px; font-size:12.5px; text-transform:uppercase; letter-spacing:.07em; color:var(--muted); font-weight:700; display:flex; align-items:center; justify-content:space-between; }
   .panel .chart-wrap{ position:relative; height:230px; }
@@ -288,6 +289,7 @@
     .kv-grid{ grid-template-columns:1fr; }
     .kpi-grid{ grid-template-columns:1fr 1fr; }
     .panel-grid3{ grid-template-columns:1fr; }
+    .panel-grid-half{ grid-template-columns:1fr; }
     .kanban{ grid-template-columns:1fr; }
   }
   @media (max-width: 640px){
@@ -403,8 +405,8 @@
       <div id="mainContent"></div>
 
       <div class="page-footer">
-        <span>Western Region Health Directorate</span>
-        <span>Contact the Regional Equipment Manager on 0506971001 for further information</span>
+        <span>CEU Regional Platform · Western Region Health Directorate</span>
+        <span>Backend: Supabase (Postgres + RLS) · Realtime sync enabled</span>
       </div>
     </div>
   </div>
