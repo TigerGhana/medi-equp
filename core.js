@@ -18,12 +18,12 @@
 window.SUPABASE_URL = 'https://xxfvxrzcgowpkcfrvcyd.supabase.co';
 window.SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inh4ZnZ4cnpjZ293cGtjZnJ2Y3lkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODY3Nzk2MDMsImV4cCI6MjEwMjM1NTYwM30.-E1faHOWwVo7wnRfsofLqz2g-A30rHK1It2Nhn1R5C4';
 
-var CONDITION_OPTIONS = ['FUNCTIONAL','FUNCTIONAL BUT NOT IN USE','NEEDS REPAIR','NON-FUNCTIONAL','UNDER MAINTENANCE','OBSOLETE','UNKNOWN'];
+var CONDITION_OPTIONS = ['FUNCTIONAL','FUNCTIONAL BUT NOT IN USE','NEEDS REPAIR','NEEDS REPLACEMENT','NON-FUNCTIONAL','UNDER MAINTENANCE','OBSOLETE','UNKNOWN'];
 var CAL_STATUS_OPTIONS = ['PASSED CALIBRATION','NOT CALIBRATED','OUT OF CALIBRATION','Not Applicable','Not Specified'];
 var PRIORITY_OPTIONS = ['low','medium','high','critical'];
 var MAINT_STATUS_OPTIONS = ['reported','assigned','repairing','completed','closed'];
-var ROLE_OPTIONS = ['viewer','engineer','facility_director','facility_admin','regional_director','regional_admin'];
-var ROLE_LABELS = { regional_admin:'Regional Equipment Manager', regional_director:'Regional Director', facility_admin:'Facility Administrator', facility_director:'Facility Director', engineer:'Biomedical Engineer', viewer:'Viewer' };
+var ROLE_OPTIONS = ['viewer','engineer','facility_incharge','facility_director','facility_admin','district_director','regional_director','regional_admin'];
+var ROLE_LABELS = { regional_admin:'Regional Equipment Manager', regional_director:'Regional Director', facility_admin:'Facility Administrator', facility_director:'Facility Director', district_director:'District Director', facility_incharge:'Facility Incharge', engineer:'Biomedical Engineer', viewer:'Viewer' };
 var DOC_TYPES = ['Manual','Certificate','Warranty','Photo','Other'];
 
 window.APP = window.APP || {};
@@ -159,7 +159,7 @@ function mapEquipment(r){
 }
 function toDbEquipment(f){
   return {
-    facility_id:f.facilityId, category_id:f.categoryId||null, asset_code:f.assetCode, name:f.name,
+    facility_id:f.facilityId, category_id:f.categoryId||null, asset_code:(f.assetCode && String(f.assetCode).trim()) || null, name:f.name,
     manufacturer:f.manufacturer||'Unknown', model:f.model||null, serial_number:f.serial||null, department:f.department||null,
     location:f.location||null, condition:f.condition, installation_date:f.installDate||null, warranty_expiry:f.warrantyExpiry||null,
     calibration_status:f.calibrationStatus, next_calibration_date:f.nextCalibration||null, responsible_person:f.responsiblePerson||null,
@@ -181,7 +181,7 @@ function mapDocument(r){
   return { id:r.id, equipmentId:r.equipment_id, fileName:r.file_name, fileUrl:r.file_url, docType:r.doc_type, uploadedBy:r.uploaded_by, createdAt:r.created_at };
 }
 function mapUser(r){
-  return { id:r.id, name:r.name, email:r.email, role:r.role, facilityId:r.facility_id, regionId:r.region_id, isActive:r.is_active, createdAt:r.created_at };
+  return { id:r.id, name:r.name, email:r.email, role:r.role, facilityId:r.facility_id, regionId:r.region_id, district:r.district, isActive:r.is_active, createdAt:r.created_at };
 }
 function mapRegionSettings(r){
   return { regionId:r.region_id, bannerUrl:r.banner_url, updatedAt:r.updated_at, updatedBy:r.updated_by };
@@ -210,7 +210,7 @@ function isOverdue(rec){
   return d < today;
 }
 function needsAttention(rec){
-  return rec.condition === 'NON-FUNCTIONAL' || rec.condition === 'NEEDS REPAIR' || rec.condition === 'OBSOLETE' ||
+  return rec.condition === 'NON-FUNCTIONAL' || rec.condition === 'NEEDS REPAIR' || rec.condition === 'NEEDS REPLACEMENT' || rec.condition === 'OBSOLETE' ||
          rec.calibrationStatus === 'OUT OF CALIBRATION' || rec.calibrationStatus === 'NOT CALIBRATED' || isOverdue(rec);
 }
 function fmtDate(s){
@@ -229,6 +229,7 @@ function conditionPillClass(c){
   if(c === 'FUNCTIONAL') return 'ok';
   if(c === 'FUNCTIONAL BUT NOT IN USE') return 'info';
   if(c === 'NEEDS REPAIR') return 'warn';
+  if(c === 'NEEDS REPLACEMENT') return 'bad';
   if(c === 'NON-FUNCTIONAL') return 'bad';
   if(c === 'UNDER MAINTENANCE') return 'warn';
   if(c === 'OBSOLETE') return 'neutral';
@@ -247,12 +248,16 @@ function isRegionalAdmin(){ return STATE.profile && STATE.profile.role === 'regi
 function isRegionalDirector(){ return STATE.profile && STATE.profile.role === 'regional_director'; }
 function isFacilityAdmin(){ return STATE.profile && STATE.profile.role === 'facility_admin'; }
 function isFacilityDirector(){ return STATE.profile && STATE.profile.role === 'facility_director'; }
-function isEngineer(){ return STATE.profile && STATE.profile.role === 'engineer'; }
+// Biomedical Engineer and Facility Incharge have exactly the same permissions, so every
+// isEngineer() check covers both. Use isFacilityIncharge() only where they must be told apart.
+function isEngineer(){ return STATE.profile && (STATE.profile.role === 'engineer' || STATE.profile.role === 'facility_incharge'); }
+function isFacilityIncharge(){ return STATE.profile && STATE.profile.role === 'facility_incharge'; }
+function isDistrictDirector(){ return STATE.profile && STATE.profile.role === 'district_director'; }
 // "Scoped" = sees region-wide data (dashboards, facility lists, cross-facility
 // equipment/maintenance/transfers) -- true for both Regional Equipment Manager and
 // Regional Director. Everything that actually WRITES data stays gated to
 // isRegionalAdmin() alone -- Director is strictly view-only.
-function isRegionalScoped(){ return isRegionalAdmin() || isRegionalDirector(); }
+function isRegionalScoped(){ return isRegionalAdmin() || isRegionalDirector() || isDistrictDirector(); } // the database limits a District Director to their own district
 function canEditEquipment(){ return isFacilityAdmin() || isEngineer(); }
 function canDeleteEquipment(){ return isFacilityAdmin(); }
 function canEditMaintenance(){ return isFacilityAdmin() || isEngineer(); }
@@ -260,7 +265,7 @@ function canManageUsers(){ return isFacilityAdmin() || isRegionalAdmin(); }
 function canApproveTransfers(){ return isRegionalAdmin(); }
 function canRequestTransfers(){ return isFacilityAdmin(); }
 APP.isRegionalAdmin=isRegionalAdmin; APP.isRegionalDirector=isRegionalDirector; APP.isRegionalScoped=isRegionalScoped;
-APP.isFacilityAdmin=isFacilityAdmin; APP.isFacilityDirector=isFacilityDirector; APP.isEngineer=isEngineer;
+APP.isFacilityAdmin=isFacilityAdmin; APP.isFacilityDirector=isFacilityDirector; APP.isEngineer=isEngineer; APP.isFacilityIncharge=isFacilityIncharge; APP.isDistrictDirector=isDistrictDirector;
 APP.canEditEquipment=canEditEquipment; APP.canDeleteEquipment=canDeleteEquipment; APP.canEditMaintenance=canEditMaintenance;
 APP.canManageUsers=canManageUsers; APP.canApproveTransfers=canApproveTransfers; APP.canRequestTransfers=canRequestTransfers;
 
@@ -502,9 +507,9 @@ var ROUTES = [
   { hash:'facilities', label:'Facilities', icon:'fa-hospital', crumb:'Regional', regionalOnly:true },
   { hash:'equipment', label:'Equipment', icon:'fa-kit-medical', crumb:'Inventory' },
   { hash:'maintenance', label:'Maintenance', icon:'fa-screwdriver-wrench', crumb:'Workflow' },
-  { hash:'transfers', label:'Transfers', icon:'fa-truck-fast', crumb:'Equipment Movement', hideFor:['viewer','engineer'] },
-  { hash:'reports', label:'Reports', icon:'fa-file-lines', crumb:'Analytics', hideFor:['viewer','engineer'] },
-  { hash:'users', label:'Users', icon:'fa-users-gear', crumb:'Administration', hideFor:['viewer','engineer'] },
+  { hash:'transfers', label:'Transfers', icon:'fa-truck-fast', crumb:'Equipment Movement', hideFor:['viewer','engineer','facility_incharge'] },
+  { hash:'reports', label:'Reports', icon:'fa-file-lines', crumb:'Analytics', hideFor:['viewer','engineer','facility_incharge'] },
+  { hash:'users', label:'Users', icon:'fa-users-gear', crumb:'Administration', hideFor:['viewer','engineer','facility_incharge'] },
   { hash:'settings', label:'Settings', icon:'fa-gear', crumb:'Account' }
 ];
 APP.ROUTES = ROUTES;
@@ -526,7 +531,7 @@ function renderNav(){
   var role = STATE.profile.role;
   var html = '';
   ROUTES.forEach(function(r){
-    if(r.regionalOnly && role !== 'regional_admin' && role !== 'regional_director') return;
+    if(r.regionalOnly && role !== 'regional_admin' && role !== 'regional_director' && role !== 'district_director') return;
     if(r.hideFor && r.hideFor.indexOf(role) !== -1) return;
     html += '<a data-route="'+r.hash+'"><i class="fa-solid '+r.icon+'"></i>'+esc(r.label)+'</a>';
   });
@@ -571,7 +576,10 @@ function renderUserBadge(){
   qs('userName').textContent = p.name;
   qs('userRole').textContent = ROLE_LABELS[p.role] || p.role;
   var scopeLabel, scopeValue;
-  if(p.role === 'regional_admin' || p.role === 'regional_director'){
+  if(p.role === 'district_director'){
+    scopeLabel = 'District';
+    scopeValue = p.district || 'No district assigned';
+  } else if(p.role === 'regional_admin' || p.role === 'regional_director'){
     scopeLabel = 'Region';
     var reg = STATE.regions.find(function(r){ return r.id === p.regionId; });
     scopeValue = reg ? reg.name : 'No region assigned';
