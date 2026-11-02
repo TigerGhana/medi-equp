@@ -9,7 +9,7 @@ const { STATE, esc, dash, setText, qs, fmtDate, fmtDateTime, isOverdue, needsAtt
   conditionPillClass, calPillClass, priorityPillClass, statusPillClass,
   facilityById, facilityName, equipmentById, userById, userName, categoryName,
   CONDITION_OPTIONS, CAL_STATUS_OPTIONS, PRIORITY_OPTIONS, MAINT_STATUS_OPTIONS, ROLE_OPTIONS, ROLE_LABELS, DOC_TYPES,
-  isRegionalAdmin, isRegionalDirector, isRegionalScoped, isFacilityAdmin, isFacilityDirector, isEngineer, canEditEquipment, canDeleteEquipment, canEditMaintenance, canManageUsers,
+  isRegionalAdmin, isRegionalDirector, isRegionalScoped, isFacilityAdmin, isFacilityDirector, isFacilityIncharge, isDistrictDirector, isEngineer, canEditEquipment, canDeleteEquipment, canEditMaintenance, canManageUsers,
   canApproveTransfers, canRequestTransfers, openModal, closeModal, showError, showInfo, describeError, sb } = APP;
 
 let currentView = { name: 'dashboard', param: null };
@@ -18,6 +18,7 @@ const CONDITION_COLORS = {
   'FUNCTIONAL': '#1E9E64',
   'FUNCTIONAL BUT NOT IN USE': '#2C6FB0',
   'NEEDS REPAIR': '#C9861A',
+  'NEEDS REPLACEMENT': '#DB2777',
   'NON-FUNCTIONAL': '#D14343',
   'UNDER MAINTENANCE': '#8B5CF6',
   'OBSOLETE': '#8B9997',
@@ -159,7 +160,7 @@ function renderDashboard(){
 }
 
 function renderRegionalDashboard(){
-  setPageTitle('Regional Dashboard');
+  setPageTitle(isDistrictDirector() ? 'District Dashboard' : 'Regional Dashboard');
   const region = STATE.regions.find(r => r.id === STATE.profile.regionId);
   const eq = STATE.equipment;
   const total = eq.length;
@@ -192,7 +193,7 @@ function renderRegionalDashboard(){
 
     <div class="panel-grid2">
       <div class="panel">
-        <h3>Facility Performance — ${esc(region ? region.name : 'Your Region')}</h3>
+        <h3>Facility Performance — ${isDistrictDirector() ? esc((STATE.profile.district || 'Your') + ' District') : esc(region ? region.name : 'Your Region')}</h3>
         <div class="table-shell"><div class="table-scroll" style="max-height:420px;">
           <table><thead><tr>
             <th class="no-sort">Facility</th><th class="no-sort">District</th><th class="no-sort">Equipment</th>
@@ -213,14 +214,13 @@ function renderRegionalDashboard(){
         </div></div>
       </div>
       <div class="panel">
-        <h3>Region-wide Equipment Condition</h3>
+        <h3>${isDistrictDirector() ? 'District-wide' : 'Region-wide'} Equipment Condition</h3>
         <div class="chart-wrap tall"><canvas id="chartRegionCondition"></canvas></div>
       </div>
     </div>
 
-    <div class="panel-grid3">
+    <div class="panel-grid-half">
       <div class="panel"><h3>Calibration Status</h3><div class="chart-wrap"><canvas id="chartRegionCal"></canvas></div></div>
-      <div class="panel"><h3>Top Manufacturers</h3><div class="barlist" id="regionManBar"></div></div>
       <div class="panel"><h3>Equipment by Facility</h3><div class="barlist" id="regionFacBar"></div></div>
     </div>
   `;
@@ -241,7 +241,6 @@ function renderRegionalDashboard(){
     data:{ labels:Object.keys(calMap), datasets:[{ data:Object.values(calMap), backgroundColor:'#1E3A6E', borderRadius:4 }] },
     options:{ plugins:{ legend:{ display:false } }, maintainAspectRatio:false, scales:{ x:{ ticks:{ font:{size:10} } } } }
   });
-  renderBarList('regionManBar', countBy(eq, e => e.manufacturer), 8);
   renderBarList('regionFacBar', countBy(eq, e => facilityName(e.facilityId)), 8);
   wireBannerHero(STATE.profile.regionId, isRegionalAdmin());
 }
@@ -298,10 +297,9 @@ function renderFacilityDashboardInto(container, f, opts){
       <div class="kpi-card"><div class="lbl"><i class="fa-solid ${k.icon}"></i> ${esc(k.label)}</div><div class="val ${k.cls||''}">${k.value}</div></div>
     `).join('')}</div>
 
-    <div class="panel-grid3">
+    <div class="panel-grid-half">
       <div class="panel"><h3>Equipment Condition</h3><div class="chart-wrap"><canvas id="chartFacCondition"></canvas></div></div>
       <div class="panel"><h3>Department Distribution</h3><div class="barlist" id="facDeptBar"></div></div>
-      <div class="panel"><h3>Manufacturer Analysis</h3><div class="barlist" id="facManBar"></div></div>
     </div>
 
     <div class="section-head"><h2>Needs Attention</h2><span class="hint">${attention.length} flagged item(s)</span></div>
@@ -327,7 +325,6 @@ function renderFacilityDashboardInto(container, f, opts){
     options:{ plugins:{ legend:{ position:'bottom', labels:{ boxWidth:10, font:{ size:11 } } } }, maintainAspectRatio:false }
   });
   renderBarList('facDeptBar', countBy(eq, e => e.department), 8);
-  renderBarList('facManBar', countBy(eq, e => e.manufacturer), 8);
   const attnBody = qs('facAttnBody');
   if(attnBody) attnBody.querySelectorAll('tr[data-id]').forEach(tr => tr.addEventListener('click', () => { location.hash = '#/equipment/' + tr.getAttribute('data-id'); }));
   if(opts.canManageFacility){
@@ -342,6 +339,7 @@ function attentionReason(rec){
   const reasons = [];
   if(rec.condition === 'NON-FUNCTIONAL') reasons.push('Non-functional');
   if(rec.condition === 'NEEDS REPAIR') reasons.push('Needs repair');
+  if(rec.condition === 'NEEDS REPLACEMENT') reasons.push('Needs replacement');
   if(rec.condition === 'OBSOLETE') reasons.push('Obsolete');
   if(isOverdue(rec)) reasons.push('Calibration overdue');
   else if(rec.calibrationStatus === 'OUT OF CALIBRATION') reasons.push('Out of calibration');
@@ -369,7 +367,7 @@ function renderFacilitiesList(){
   const region = STATE.regions.find(r => r.id === STATE.profile.regionId);
   mainEl().innerHTML = `
     <div class="section-head">
-      <h2>Facilities in ${esc(region ? region.name : 'your region')}</h2>
+      <h2>Facilities in ${isDistrictDirector() ? esc((STATE.profile.district || 'your') + ' District') : esc(region ? region.name : 'your region')}</h2>
       <span class="hint">${STATE.facilities.length} facilities</span>
     </div>
     <div class="controls">
@@ -398,6 +396,20 @@ function renderFacilitiesList(){
   if(addBtn) addBtn.addEventListener('click', () => openFacilityForm());
 }
 
+// Districts are typed when a facility is added, and a District Director is matched to
+// facilities by that text -- so keep spellings consistent: group by a trimmed, lowercase
+// key and reuse the spelling already on record.
+function normDistrict(v){ return (v || '').trim().toLowerCase(); }
+function districtChoices(){
+  const seen = {};
+  STATE.facilities.forEach(f => { const k = normDistrict(f.district); if(k && !seen[k]) seen[k] = f.district.trim(); });
+  return Object.keys(seen).map(k => seen[k]).sort((a, b) => a.localeCompare(b));
+}
+function canonicalDistrict(v){
+  const typed = (v || '').trim();
+  const match = districtChoices().find(d => normDistrict(d) === normDistrict(typed));
+  return match || typed;
+}
 function openFacilityForm(existing){
   const isEdit = !!existing;
   const f = existing || { name:'', facilityType:'Hospital', district:'', address:'', contact:'' };
@@ -417,7 +429,7 @@ function openFacilityForm(existing){
       <div class="form-field" id="ff_type_other_wrap" style="${initialSelect==='Others'?'':'display:none;'}">
         <label>Specify Type *</label><input type="text" id="ff_type_other" value="${esc(initialOtherText)}" placeholder="e.g. Diagnostic Centre">
       </div>
-      <div class="form-field"><label>District</label><input type="text" id="ff_district" value="${esc(f.district||'')}"></div>
+      <div class="form-field"><label>District *</label><input type="text" id="ff_district" list="ff_district_list" autocomplete="off" placeholder="Pick one, or type a new district" value="${esc(f.district||'')}"><datalist id="ff_district_list">${districtChoices().map(d => `<option value="${esc(d)}"></option>`).join('')}</datalist></div>
       <div class="form-field span2"><label>Address</label><input type="text" id="ff_address" value="${esc(f.address||'')}"></div>
       <div class="form-field span2"><label>Contact</label><input type="text" id="ff_contact" value="${esc(f.contact||'')}"></div>
     </div>
@@ -436,6 +448,7 @@ function openFacilityForm(existing){
     const errEl = qs('ff_error'); errEl.classList.remove('show');
     const name = qs('ff_name').value.trim();
     if(!name){ errEl.textContent = 'Facility name is required.'; errEl.classList.add('show'); return; }
+    if(!qs('ff_district').value.trim()){ errEl.textContent = 'District is required — it decides which District Director can see this facility.'; errEl.classList.add('show'); return; }
     const selectedType = qs('ff_type').value;
     const otherText = qs('ff_type_other').value.trim();
     if(selectedType === 'Others' && !otherText){ errEl.textContent = 'Please specify the facility type.'; errEl.classList.add('show'); return; }
@@ -444,7 +457,7 @@ function openFacilityForm(existing){
     try{
       const row = APP.toDbFacility({
         regionId: STATE.profile.regionId, name,
-        facilityType: finalType, district: qs('ff_district').value.trim(),
+        facilityType: finalType, district: canonicalDistrict(qs('ff_district').value),
         address: qs('ff_address').value.trim(), contact: qs('ff_contact').value.trim()
       });
       let res;
@@ -517,6 +530,7 @@ function renderEquipmentList(){
         <input type="text" id="eqSearch" placeholder="Search by name, serial, equipment code or manufacturer…" value="${esc(eqFilters.q)}">
       </div>
       ${showFacilityCol ? `<select id="eqFilterFacility"><option value="">All facilities</option>${STATE.facilities.map(f => `<option value="${f.id}" ${eqFilters.facility===f.id?'selected':''}>${esc(f.name)}</option>`).join('')}</select>` : ''}
+      ${departmentFilterHtml()}
       <select id="eqFilterCondition"><option value="">All conditions</option>${CONDITION_OPTIONS.map(c => `<option ${eqFilters.condition===c?'selected':''}>${c}</option>`).join('')}</select>
       <select id="eqFilterCal"><option value="">All calibration statuses</option>${CAL_STATUS_OPTIONS.map(c => `<option ${eqFilters.cal===c?'selected':''}>${c}</option>`).join('')}</select>
       <select id="eqSortSel">
@@ -546,6 +560,7 @@ function renderEquipmentList(){
   `;
   qs('eqSearch').addEventListener('input', e => { eqFilters.q = e.target.value; renderEquipmentTableBody(); });
   if(showFacilityCol) qs('eqFilterFacility').addEventListener('change', e => { eqFilters.facility = e.target.value; renderEquipmentTableBody(); });
+  qs('eqFilterDepartment').addEventListener('change', e => { eqFilters.department = e.target.value; renderEquipmentTableBody(); });
   qs('eqFilterCondition').addEventListener('change', e => { eqFilters.condition = e.target.value; renderEquipmentTableBody(); });
   qs('eqFilterCal').addEventListener('change', e => { eqFilters.cal = e.target.value; renderEquipmentTableBody(); });
   qs('eqSortSel').addEventListener('change', e => {
@@ -570,10 +585,31 @@ function renderEquipmentList(){
 
 function criticalScore(e){
   if(e.condition === 'NON-FUNCTIONAL') return 0;
-  if(isOverdue(e)) return 1;
+  if(isOverdue(e) || e.condition === 'NEEDS REPLACEMENT') return 1;
   if(e.condition === 'NEEDS REPAIR' || e.calibrationStatus === 'OUT OF CALIBRATION' || e.calibrationStatus === 'NOT CALIBRATED') return 2;
   if(e.condition === 'OBSOLETE') return 3;
   return 4;
+}
+// Departments are free text, so "Laboratory", "laboratory " and "LABORATORY" would
+// otherwise appear as three separate filter choices. Group them by a normalized key
+// (trimmed, lowercase) and show the first spelling seen.
+function normDept(v){ return (v || '').trim().toLowerCase(); }
+function departmentFilterHtml(){
+  const seen = {};
+  let hasBlank = false;
+  STATE.equipment.forEach(e => {
+    const k = normDept(e.department);
+    if(!k){ hasBlank = true; return; }
+    if(!seen[k]) seen[k] = e.department.trim();
+  });
+  const keys = Object.keys(seen).sort((a, b) => seen[a].localeCompare(seen[b]));
+  const valid = keys.concat(hasBlank ? ['__none__'] : []);
+  // Never leave a hidden filter active: if the remembered choice no longer exists, clear it.
+  if(eqFilters.department && valid.indexOf(eqFilters.department) === -1) eqFilters.department = '';
+  return '<select id="eqFilterDepartment"><option value="">All departments</option>' +
+    keys.map(k => `<option value="${esc(k)}" ${eqFilters.department === k ? 'selected' : ''}>${esc(seen[k])}</option>`).join('') +
+    (hasBlank ? `<option value="__none__" ${eqFilters.department === '__none__' ? 'selected' : ''}>— No department —</option>` : '') +
+    '</select>';
 }
 function getFilteredEquipment(){
   const q = eqFilters.q.trim().toLowerCase();
@@ -581,6 +617,10 @@ function getFilteredEquipment(){
     if(eqFilters.facility && e.facilityId !== eqFilters.facility) return false;
     if(eqFilters.condition && e.condition !== eqFilters.condition) return false;
     if(eqFilters.cal && e.calibrationStatus !== eqFilters.cal) return false;
+    if(eqFilters.department){
+      const k = normDept(e.department);
+      if(eqFilters.department === '__none__' ? k !== '' : k !== eqFilters.department) return false;
+    }
     if(q){
       const hay = `${e.name} ${e.serial||''} ${e.assetCode||''} ${e.manufacturer||''}`.toLowerCase();
       if(hay.indexOf(q) === -1) return false;
@@ -649,7 +689,7 @@ function exportEquipmentCsv(rows){
 // spreadsheet safely updates rather than duplicates.
 // =====================================================================
 const IMPORT_COLUMNS = [
-  { header:'Equipment Code', field:'assetCode', required:true },
+  { header:'Equipment Code', field:'assetCode', required:false },
   { header:'Equipment Name', field:'name', required:true },
   { header:'Department', field:'department' },
   { header:'Category', field:'categoryName' },
@@ -776,6 +816,7 @@ function processImportRows(rawRows){
 
   const toUpdate = [], toInsert = [], invalid = [];
   const seenCodes = {};
+  let noCodeCount = 0;
 
   rawRows.forEach((raw, idx) => {
     const rowNum = idx + 2; // header row + 1-indexed
@@ -802,7 +843,7 @@ function processImportRows(rawRows){
       if(normalized) rec.calibrationStatus = normalized;
     }
     if(!rec.name) errs.push('Equipment Name is required');
-    if(!rec.assetCode) errs.push('Equipment Code is required');
+    
     if(rec.condition && !CONDITION_OPTIONS.includes(rec.condition)) errs.push(`Condition must be one of: ${CONDITION_OPTIONS.join(', ')}`);
     if(rec.calibrationStatus && !CAL_STATUS_OPTIONS.includes(rec.calibrationStatus)) errs.push(`Calibration Status must be one of: ${CAL_STATUS_OPTIONS.join(', ')}`);
     IMPORT_DATE_FIELDS.forEach(f => { if(rec[f] && !/^\d{4}-\d{2}-\d{2}$/.test(rec[f])) errs.push(`${f} is not a recognizable date (${rec[f]})`); });
@@ -820,19 +861,23 @@ function processImportRows(rawRows){
       return;
     }
 
-    const key = rec.assetCode.trim().toLowerCase();
-    if(seenCodes[key]){
-      invalid.push({ rowNum, name: rec.name, errors: [`Asset Code "${rec.assetCode}" appears more than once in this file (first occurrence used, this row skipped)`] });
-      return;
+    const key = (rec.assetCode || '').trim().toLowerCase();
+    if(key){
+      if(seenCodes[key]){
+        invalid.push({ rowNum, name: rec.name, errors: [`Equipment Code "${rec.assetCode}" appears more than once in this file (first occurrence used, this row skipped)`] });
+        return;
+      }
+      seenCodes[key] = true;
+    } else {
+      noCodeCount++; // no code = nothing to match on, so it is always added as new equipment
     }
-    seenCodes[key] = true;
 
-    const existing = existingByCode[key];
+    const existing = key ? existingByCode[key] : null;
     if(existing) toUpdate.push({ ...rec, id: existing.id });
     else toInsert.push(rec);
   });
 
-  pendingEquipmentImport = { toUpdate, toInsert, invalid };
+  pendingEquipmentImport = { toUpdate, toInsert, invalid, noCode: noCodeCount };
   renderEquipmentImportPreview();
 }
 
@@ -850,7 +895,8 @@ function renderEquipmentImportPreview(){
       ${p.invalid.slice(0,50).map(r => `<div style="margin-bottom:6px;"><strong>Row ${r.rowNum}</strong> (${esc(r.name)}): ${esc(r.errors.join('; '))}</div>`).join('')}
       ${p.invalid.length > 50 ? `<div>...and ${p.invalid.length - 50} more</div>` : ''}
     </div>` : ''}
-    <p style="font-size:12px; color:var(--muted-2); margin:0 0 16px;">Matched to existing equipment by <strong>Equipment Code</strong> within your facility. Unmatched codes will be added as new records. Unknown Category names are imported without a category rather than rejected. Condition and Calibration Status are matched regardless of case or extra spaces (e.g. "functional" is accepted as FUNCTIONAL) — but a genuinely different word is still rejected.</p>
+    ${p.noCode ? `<div class="modal-alert">⚠ <div><strong>${p.noCode} row${p.noCode===1?'':'s'} ${p.noCode===1?'has':'have'} no Equipment Code</strong>, so ${p.noCode===1?'it':'they'} can't be matched to existing equipment and will be added as new. Importing the same file again would add ${p.noCode===1?'it':'them'} a second time.</div></div>` : ''}
+    <p style="font-size:12px; color:var(--muted-2); margin:0 0 16px;">Matched to existing equipment by <strong>Equipment Code</strong> within your facility. Unmatched codes, and rows with no code, will be added as new records. Unknown Category names are imported without a category rather than rejected. Condition and Calibration Status are matched regardless of case or extra spaces (e.g. "functional" is accepted as FUNCTIONAL) — but a genuinely different word is still rejected.</p>
     <div class="modal-actions"><div class="left"></div><div class="right">
       <button class="btn-secondary" id="eqImportCancel">Cancel</button>
       <button class="btn-primary" id="eqImportConfirm" style="width:auto;" ${totalValid===0?'disabled':''}>Import ${totalValid} row${totalValid===1?'':'s'}</button>
@@ -922,7 +968,7 @@ function openEquipmentForm(rec){
   const body = `
     <div class="form-grid">
       ${field('ef_name','Equipment Name','text', r.name, true)}
-      ${field('ef_assetCode','Equipment Code','text', r.assetCode, true)}
+      ${field('ef_assetCode','Equipment Code (optional)','text', r.assetCode, false)}
       ${facilityOptions}
       ${selectField('ef_category','Category', ['', ...STATE.categories.map(c=>c.id)], r.categoryId, v => v ? categoryName(v) : '— none —')}
       ${field('ef_department','Department / Ward','text', r.department)}
@@ -973,7 +1019,7 @@ async function submitEquipmentForm(isNew, rec){
     owner: qs('ef_owner').value.trim()
   };
   if(!form.name){ errEl.textContent = 'Equipment name is required.'; errEl.classList.add('show'); return; }
-  if(!form.assetCode){ errEl.textContent = 'Equipment code is required.'; errEl.classList.add('show'); return; }
+  
   if(!form.facilityId){ errEl.textContent = 'Facility is required.'; errEl.classList.add('show'); return; }
 
   const btn = qs('ef_save'); btn.disabled = true; btn.textContent = 'Saving…';
@@ -1236,7 +1282,7 @@ function openMaintenanceForm(ticket, presetEquipmentId){
   }
   const r = ticket || { equipmentId: presetEquipmentId||'', problem:'', priority:'medium', status:'reported', notes:'', cost:'' };
   const myFacilityEquipment = isRegionalAdmin() ? STATE.equipment : STATE.equipment.filter(e => e.facilityId === STATE.profile.facilityId);
-  const engineers = STATE.users.filter(u => u.role === 'engineer' && (isRegionalAdmin() || u.facilityId === STATE.profile.facilityId));
+  const engineers = STATE.users.filter(u => (u.role === 'engineer' || u.role === 'facility_incharge') && (isRegionalAdmin() || u.facilityId === STATE.profile.facilityId));
 
   const body = `
     <div class="form-grid">
@@ -1621,14 +1667,17 @@ function renderUsers(){
 }
 
 function openUserForm(u){
-  const assignableRoles = isRegionalAdmin() ? ROLE_OPTIONS : ['viewer','engineer','facility_director','facility_admin'];
+  const assignableRoles = isRegionalAdmin() ? ROLE_OPTIONS : ['viewer','engineer','facility_incharge','facility_director','facility_admin'];
   const facilityOptions = isRegionalAdmin() ? STATE.facilities : STATE.facilities.filter(f => f.id === STATE.profile.facilityId);
+  const dChoices = districtChoices();
+  if(u.district && !dChoices.some(d => normDistrict(d) === normDistrict(u.district))) dChoices.push(u.district);
   const body = `
     <div class="form-grid">
       <div class="form-field"><label>Name</label><input type="text" value="${esc(u.name)}" disabled></div>
       <div class="form-field"><label>Email</label><input type="text" value="${esc(u.email)}" disabled></div>
       ${selectField('uf_role','Role', assignableRoles, u.role, v => ROLE_LABELS[v]||v)}
-      <div class="form-field"><label>Facility</label><select id="uf_facility"><option value="">— none —</option>${facilityOptions.map(f => `<option value="${f.id}" ${f.id===u.facilityId?'selected':''}>${esc(f.name)}</option>`).join('')}</select></div>
+      <div class="form-field" id="uf_facility_wrap"><label>Facility</label><select id="uf_facility"><option value="">— none —</option>${facilityOptions.map(f => `<option value="${f.id}" ${f.id===u.facilityId?'selected':''}>${esc(f.name)}</option>`).join('')}</select></div>
+      <div class="form-field" id="uf_district_wrap" style="display:none;"><label>District *</label><select id="uf_district"><option value="">— select district —</option>${dChoices.map(d => `<option value="${esc(d)}" ${normDistrict(d)===normDistrict(u.district)?'selected':''}>${esc(d)}</option>`).join('')}</select></div>
       <div class="form-field"><label>Active</label><select id="uf_active"><option value="true" ${u.isActive?'selected':''}>Active</option><option value="false" ${!u.isActive?'selected':''}>Inactive</option></select></div>
     </div>
     <div class="field-error" id="uf_error"></div>
@@ -1639,20 +1688,30 @@ function openUserForm(u){
   `;
   openModal({ title:`Edit User: ${u.name}`, code: u.email, bodyHtml: body });
   qs('uf_cancel').addEventListener('click', closeModal);
+  const syncUserFormFields = () => {
+    const r = qs('uf_role').value;
+    qs('uf_district_wrap').style.display = r === 'district_director' ? '' : 'none';
+    qs('uf_facility_wrap').style.display = (r === 'regional_admin' || r === 'regional_director' || r === 'district_director') ? 'none' : '';
+  };
+  qs('uf_role').addEventListener('change', syncUserFormFields);
+  syncUserFormFields();
   qs('uf_save').addEventListener('click', async () => {
     const errEl = qs('uf_error'); errEl.classList.remove('show');
     const role = qs('uf_role').value;
     const facilityId = qs('uf_facility').value || null;
-    const isRegionScopedRole = role === 'regional_admin' || role === 'regional_director';
+    const isRegionScopedRole = role === 'regional_admin' || role === 'regional_director' || role === 'district_director';
     if(!isRegionScopedRole && !facilityId){
-      errEl.textContent = 'Select a facility — every role except Regional Equipment Manager and Regional Director must belong to one.';
+      errEl.textContent = 'Select a facility — every role except Regional Equipment Manager, Regional Director and District Director must belong to one.';
       errEl.classList.add('show');
       return;
     }
+    const district = role === 'district_director' ? (qs('uf_district').value || null) : null;
+    if(role === 'district_director' && !district){ errEl.textContent = 'Select the district this Director oversees.'; errEl.classList.add('show'); return; }
     const btn = qs('uf_save'); btn.disabled = true; btn.textContent = 'Saving…';
     try{
       const row = { role, facility_id: isRegionScopedRole ? null : facilityId, is_active: qs('uf_active').value === 'true' };
       row.region_id = isRegionScopedRole ? STATE.profile.regionId : null;
+      row.district = district;
       const res = await sb.from('users').update(row).eq('id', u.id).select().single();
       if(res.error) throw res.error;
       const idx = STATE.users.findIndex(x => x.id === u.id);
@@ -1673,15 +1732,19 @@ var helpTab = 'start';
 var ROLE_SUMMARIES = [
   { role:'regional_admin', title:'Regional Equipment Manager', icon:'fa-user-shield', pill:'ok',
     blurb:'Full oversight and control across every facility in the region.',
-    can:['View every facility, all equipment, maintenance, transfers, and reports region-wide','Add, edit, and delete facilities','Approve or reject equipment transfer requests between facilities','Add, edit, and deactivate any user — including promoting Facility Administrators and Regional Directors','Upload the region banner image shown on the dashboard','Update maintenance tickets across any facility'],
+    can:['View every facility, all equipment, maintenance, transfers, and reports region-wide','Add, edit, and delete facilities','Approve or reject equipment transfer requests between facilities','Add, edit, and deactivate any user — including promoting Facility Administrators, Regional Directors, and District Directors','Upload the region banner image shown on the dashboard','Update maintenance tickets across any facility'],
     cannot:['Add or edit individual equipment records directly (that happens at the facility level)'] },
   { role:'regional_director', title:'Regional Director', icon:'fa-eye', pill:'info',
     blurb:'Sees everything a Regional Equipment Manager sees, region-wide — but strictly read-only.',
     can:['View every facility, all equipment, maintenance, transfers, users, and reports region-wide','Export and print reports'],
     cannot:['Add, edit, or delete anything — facilities, equipment, users, tickets, or transfers','Approve transfers or manage users','Change their own role (only a Regional Equipment Manager can add, edit, or remove a Director)'] },
+  { role:'district_director', title:'District Director', icon:'fa-map-location-dot', pill:'info',
+    blurb:'Sees everything in the facilities of their own district — like a Regional Director, but limited to one district. Strictly read-only.',
+    can:['View every facility in their district, plus its equipment, maintenance tickets, transfers, and staff list','Use the dashboard, equipment register and reports for their district','Export and print reports'],
+    cannot:['See facilities in other districts','Add, edit, or delete anything — equipment, tickets, transfers, facilities, or user accounts','Change their own role or district (only a Regional Equipment Manager can add, edit, or remove a District Director; a facility\'s district is set in its District field when the facility is added)'] },
   { role:'facility_admin', title:'Facility Administrator', icon:'fa-hospital-user', pill:'warn',
     blurb:'Runs the day-to-day equipment register for their own facility.',
-    can:['Add, edit, and delete equipment at their facility','Import equipment in bulk from an Excel spreadsheet, or export the current register','Report and manage maintenance tickets, and assign them to engineers','Add calibration records and upload documents (manuals, certificates, warranties, photos)','Request equipment transfers to other facilities','Add, edit, and deactivate Viewer, Engineer, Facility Director, and Facility Administrator accounts at their own facility'],
+    can:['Add, edit, and delete equipment at their facility','Import equipment in bulk from an Excel spreadsheet, or export the current register','Report and manage maintenance tickets, and assign them to engineers','Add calibration records and upload documents (manuals, certificates, warranties, photos)','Request equipment transfers to other facilities','Add, edit, and deactivate Viewer, Engineer, Facility Incharge, Facility Director, and Facility Administrator accounts at their own facility'],
     cannot:['See or act on other facilities\' data','Promote anyone to Regional Equipment Manager or Regional Director'] },
   { role:'facility_director', title:'Facility Director', icon:'fa-building-shield', pill:'info',
     blurb:'Sees everything at their own facility — the facility-level equivalent of a Regional Director. Strictly read-only.',
@@ -1691,6 +1754,10 @@ var ROLE_SUMMARIES = [
     blurb:'Handles hands-on maintenance, equipment condition, and commissioning new equipment at their facility.',
     can:['View their facility\'s equipment and maintenance tickets','Add new equipment records at their facility','Update equipment condition and calibration status','Update maintenance tickets that are assigned to them, add notes and repair cost','Add calibration records and upload documents'],
     cannot:['Delete equipment records (Facility Administrators only)','Manage other users','See or update a maintenance ticket assigned to a different engineer'] },
+  { role:'facility_incharge', title:'Facility Incharge', icon:'fa-clipboard-user', pill:'neutral',
+    blurb:'The person responsible for a health centre or CHPS compound. Has exactly the same permissions as a Biomedical Engineer.',
+    can:['View their facility\'s equipment and maintenance tickets','Add new equipment records at their facility','Update equipment condition and calibration status','Update maintenance tickets that are assigned to them, add notes and repair cost','Add calibration records and upload documents'],
+    cannot:['Delete equipment records (Facility Administrators only)','Manage other users','See or update a maintenance ticket assigned to a different person'] },
   { role:'viewer', title:'Viewer', icon:'fa-glasses', pill:'neutral',
     blurb:'Read-only access — for anyone who needs visibility without needing to make changes.',
     can:['View their facility\'s dashboard, equipment register, and maintenance status'],
@@ -1702,7 +1769,7 @@ function renderHelp(){
   const myRole = STATE.profile.role;
   mainEl().innerHTML = `
     <div class="section-head">
-      <h2>How to use this dashboad</h2>
+      <h2>How to Use This Platform</h2>
       <span class="hint">You're signed in as ${esc(ROLE_LABELS[myRole]||myRole)}</span>
     </div>
     <div class="tabs">
@@ -1724,28 +1791,28 @@ function renderHelpBody(myRole){
   if(helpTab === 'start'){
     body.innerHTML = `
       <div class="panel" style="margin-bottom:16px;">
-        <h3>What is this Medical Equipment Management System about?</h3>
+        <h3>What is the CEU Regional Platform?</h3>
         <p style="font-size:13.5px; color:var(--muted); line-height:1.6; margin:0;">
           This is the Western Region Health Directorate's clinical engineering equipment management system.
-          It tracks major medical equipment across facilities in the region — functional status, calibration status,
-          maintenance history, and equipment transfers, reporting equipment faults, submitting request for medical equipment, installationa and user training request — from one place, with each facility responsible for its own
-          inventory and the Regional Health Directorate able to see the full picture. There are four (4) main tabs- Getting Started (current tab), Roles  & Permissions, App Sections and  FAQ. Kindly check all these to be familiar with this system. 
+          It tracks medical equipment across every facility in the region — condition, calibration status,
+          maintenance history, and equipment transfers — from one place, with each facility responsible for its own
+          register and the region able to see the full picture.
         </p>
       </div>
       <div class="panel">
         <h3>Three things to know before you start</h3>
         <div class="timeline">
           <div class="timeline-item"><div class="timeline-dot"></div><div class="timeline-body">
-            <div class="t1">New accounts start as Viewers</div>
-            <div class="t2">When you first create an account using your email and a password you can remember, you can sign in but can't change anything yet. A Regional Equipment Manager or your Facility Administrator of the system needs to assign you a role and facility — ask them once you've signed up. You can contact the Regional Equipment Manager on 0506971001 for further details.</div>
+            <div class="t1">New accounts start as read-only Viewers</div>
+            <div class="t2">When you first create an account, you can sign in but can't change anything yet. A Regional Equipment Manager or your Facility Administrator needs to assign you a role and facility — ask them once you've signed up.</div>
           </div></div>
           <div class="timeline-item"><div class="timeline-dot"></div><div class="timeline-body">
             <div class="t1">Every equipment record has a QR code</div>
             <div class="t2">Open any piece of equipment and check its "QR Code" tab. Print it and stick it on the physical device — scanning it later opens that exact equipment profile (you'll need to sign in first if you aren't already).</div>
           </div></div>
           <div class="timeline-item"><div class="timeline-dot"></div><div class="timeline-body">
-            <div class="t1">Password resets</div>
-            <div class="t2">It is recommended that you use a secured password you can always remember. However, if you forget your password, contact your Facility Administrator or the Regional Equipment 0n 0506971001 — they can reset it for you.</div>
+            <div class="t1">Password resets aren't self-service yet</div>
+            <div class="t2">If you forget your password, contact your Regional or Facility Administrator directly — they can reset it for you right away.</div>
           </div></div>
         </div>
       </div>
@@ -1775,13 +1842,13 @@ function renderHelpBody(myRole){
     `).join('');
   } else if(helpTab === 'sections'){
     const sections = [
-      { icon:'fa-gauge-high', title:'Dashboard', desc:'Your home screen. Shows key stats (total equipment, functional vs. faulty, calibration overdue), condition and calibration charts, and a "Needs Attention" list of equipment with problems. Regional Equipment Managers and Directors see the whole region; everyone else sees their own facility.' },
-      { icon:'fa-hospital', title:'Facilities', desc:'Regional Equipment Managers and Directors only. Lists every facility in the region with a quick health snapshot. Click one to see its full dashboard. Administrators can add, edit, or delete facilities from here.' },
+      { icon:'fa-gauge-high', title:'Dashboard', desc:'Your home screen. Shows key stats (total equipment, functional vs. faulty, calibration overdue), condition and calibration charts, and a "Needs Attention" list of equipment with problems. Regional Equipment Managers and Directors see the whole region, District Directors see their own district; everyone else sees their own facility.' },
+      { icon:'fa-hospital', title:'Facilities', desc:'Regional Equipment Managers and Regional Directors see every facility in the region, and District Directors see the facilities in their own district. Lists each facility with a quick health snapshot. Click one to see its full dashboard. Administrators can add, edit, or delete facilities from here.' },
       { icon:'fa-kit-medical', title:'Equipment', desc:'The full equipment register: search, filter, and sort every equipment record. Click any item to see its full profile across five tabs — Overview, Maintenance History, Calibration History, Documents, and QR Code. Facility Administrators and Biomedical Engineers can add and edit equipment (Facility Administrators can also delete, import from Excel, or export the register).' },
       { icon:'fa-screwdriver-wrench', title:'Maintenance', desc:'A kanban board tracking every repair ticket through Reported → Assigned → Repairing → Completed → Closed. Facility Administrators and Engineers can report issues and update tickets; Engineers only see full edit access on tickets assigned to them.' },
       { icon:'fa-truck-fast', title:'Transfers', desc:'Request equipment be moved from one facility to another. Facility Administrators submit requests; Regional Equipment Managers approve or reject them, which automatically relocates the equipment; the receiving facility confirms once it physically arrives.' },
       { icon:'fa-file-lines', title:'Reports', desc:'Export or print the Equipment Register, a Maintenance Report (repair frequency and cost), and — for Regional Equipment Managers and Directors — a Regional Facility Comparison.' },
-      { icon:'fa-users-gear', title:'Users', desc:'Manage who has access. Regional Equipment Managers and Facility Administrators can assign roles and facilities; Regional Directors and Facility Directors can view the list but not make changes.' },
+      { icon:'fa-users-gear', title:'Users', desc:'Manage who has access. Regional Equipment Managers and Facility Administrators can assign roles and facilities; Regional Directors, District Directors and Facility Directors can view the list but not make changes.' },
       { icon:'fa-gear', title:'Settings', desc:'Update your display name or change your password.' },
       { icon:'fa-arrow-up-right-from-square', title:'CEU Dashboard (Fault Reporting, Installation Request, Equipment Request)', desc:'Three links at the bottom of the sidebar that open the region\'s public equipment-request site in a new tab — for reporting a fault, requesting installation/training on new equipment, or requesting equipment your facility needs. That site is separate from this app and needs no login of its own.' }
     ];
@@ -1793,13 +1860,15 @@ function renderHelpBody(myRole){
     `).join('');
   } else if(helpTab === 'faq'){
     const faqs = [
-      { q:'I just signed up and can\'t do anything — is that an error?', a:'No — every new account starts as a read-only Viewer with no facility assigned, on purpose. Ask your Regional or Facility Administrator to assign your role and facility in the Users section, and you\'ll get access right away.' },
-      { q:'I forgot my password — what do I do?', a:'Password resets aren\'t self-service yet. Contact your Regional or Facility Administrator and they can reset it for you directly.' },
-      { q:'What\'s the difference between "Functional but Not in Use", "Needs Repair", and "Obsolete"?', a:'These are equipment condition options for anything that isn\'t simply working or broken: "Functional but Not in Use" is working but idle, "Needs Repair" is a known problem not yet critical, and "Obsolete" flags equipment for eventual retirement. All three show up wherever condition is tracked, and "Needs Repair" and "Obsolete" also surface on the "Needs Attention" list.' },
+      { q:'How do Districts work?', a:'Every facility has a District, chosen when the facility is added. A District Director sees only the facilities in their district. Districts are matched by spelling, so "Tarkwa Nsuaem" and "Tarkwa-Nsuaem" count as different districts — pick from the suggestions when adding a facility rather than typing a new spelling.' },
+      { q:'Is the Equipment Code required?', a:'No, it is optional. If you do give a code, it must be unique within your facility. Equipment with no code can still be added, edited and scanned by QR code — but an Excel import cannot match it to an existing record, so importing the same file twice would add those rows twice.' },
+      { q:'I just signed up and can\'t do anything — is that a bug?', a:'No — every new account starts as a read-only Viewer with no facility assigned, on purpose. Ask your Regional or Facility Administrator to assign your role and facility in the Users section, and you\'ll get access right away.' },
+      { q:'I forgot my password — what do I do?', a:'Password resets aren\'t self-service yet. Contact your Regional or Facility Administrator and they can reset it for you directly, no email required.' },
+      { q:'What\'s the difference between "Functional but Not in Use", "Needs Repair", "Needs Replacement", and "Obsolete"?', a:'These are equipment condition options for anything that isn\'t simply working or broken: "Functional but Not in Use" is working but idle, "Needs Repair" is a known problem not yet critical, "Needs Replacement" is equipment too worn or damaged to be worth repairing, and "Obsolete" flags equipment for eventual retirement. All four show up wherever condition is tracked, and "Needs Repair", "Needs Replacement" and "Obsolete" also surface on the "Needs Attention" list.' },
       { q:'How do I add a lot of equipment at once instead of one at a time?', a:'On the Equipment page, Facility Administrators can click "Template" to download a correctly-formatted spreadsheet, fill it in, then click "Import from Excel" to upload it. You\'ll see a preview of what will be added or updated before anything is saved.' },
       { q:'What does the QR code on an equipment page actually do?', a:'It\'s a direct link to that equipment\'s profile page. Print it and attach it to the physical device — anyone who scans it later (and signs in, if they aren\'t already) lands straight on that equipment\'s record.' },
       { q:'Why can\'t I see equipment from another facility?', a:'By design — each facility\'s data is only visible to its own staff, plus Regional Equipment Managers and Regional Directors who oversee the whole region. This keeps each facility\'s register private to the people responsible for it.' },
-      { q:'What are the Fault Reporting / Installation Request / Equipment Request links at the bottom of the sidebar?', a:'These open in a new tab — an additional tool for submitting a fault report, requesting installation/training on new equipment, or requesting equipment. It doesn\'t need its own login, but you do need to be signed in here first to see the links.' }
+      { q:'What are the Fault Reporting / Installation Request / Equipment Request links at the bottom of the sidebar?', a:'These open the region\'s public-facing CEU Dashboard in a new tab — a separate tool for submitting a fault report, requesting installation/training on new equipment, or requesting equipment. It doesn\'t need its own login, but you do need to be signed in here first to see the links.' }
     ];
     body.innerHTML = faqs.map((f,i) => `
       <div class="panel" style="margin-bottom:10px;">
@@ -1821,7 +1890,7 @@ function renderSettings(){
           <div class="form-field span2"><label>Full Name</label><input type="text" id="st_name" value="${esc(p.name)}"></div>
           <div class="form-field"><label>Email</label><input type="text" value="${esc(p.email)}" disabled></div>
           <div class="form-field"><label>Role</label><input type="text" value="${esc(ROLE_LABELS[p.role]||p.role)}" disabled></div>
-          <div class="form-field span2"><label>${(p.role==='regional_admin'||p.role==='regional_director')?'Region':'Facility'}</label><input type="text" value="${esc((p.role==='regional_admin'||p.role==='regional_director') ? (STATE.regions.find(r=>r.id===p.regionId)||{}).name||'Not assigned' : (p.facilityId?facilityName(p.facilityId):'Not assigned'))}" disabled></div>
+          <div class="form-field span2"><label>${p.role==='district_director'?'District':((p.role==='regional_admin'||p.role==='regional_director')?'Region':'Facility')}</label><input type="text" value="${esc(p.role==='district_director' ? (p.district||'Not assigned') : ((p.role==='regional_admin'||p.role==='regional_director') ? (STATE.regions.find(r=>r.id===p.regionId)||{}).name||'Not assigned' : (p.facilityId?facilityName(p.facilityId):'Not assigned')))}" disabled></div>
         </div>
         <div class="field-error" id="st_error"></div>
         <div class="modal-actions" style="border-top:none; padding-top:0; justify-content:flex-end;"><button class="btn-primary" id="st_save" style="width:auto;">Save Profile</button></div>
