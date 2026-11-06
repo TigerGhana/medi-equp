@@ -1,0 +1,18 @@
+{
+  "id": "./",
+  "name": "Regional Medical Equipment Platform",
+  "short_name": "CEU Equipment",
+  "description": "Medical equipment inventory, maintenance and transfers for the Western Region Health Directorate.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "theme_color": "#0B1E3D",
+  "background_color": "#0B1E3D",
+  "lang": "en",
+  "categories": ["medical", "productivity"],
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
