@@ -4,9 +4,28 @@
 (function(){
   'use strict';
 
+  var ua = navigator.userAgent || '';
+  var isSamsungBrowser = /SamsungBrowser/i.test(ua);
+  var isStandalone = !!((window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) || navigator.standalone);
+
   function whenReady(fn){
     if(document.readyState === 'loading') document.addEventListener('DOMContentLoaded', fn);
     else fn();
+  }
+
+  // Adds a button to the sidebar, just above "Sign out". Returns it, or null if the sidebar is missing.
+  function addSidebarButton(id, html, onClick){
+    var anchor = document.getElementById('btnSignOut');
+    if(!anchor || !anchor.parentNode) return null;
+    var b = document.createElement('button');
+    b.type = 'button';
+    b.id = id;
+    b.className = 'btn-signout';
+    b.style.marginBottom = '8px';
+    b.innerHTML = html;
+    b.addEventListener('click', onClick);
+    anchor.parentNode.insertBefore(b, anchor);
+    return b;
   }
 
   // 1. Service worker: what makes the app installable and quick to start.
@@ -16,31 +35,38 @@
     });
   }
 
-  // 2. "Install app" button in the sidebar (Android, and Chrome/Edge on a computer).
-  //    iPhones have no install prompt: people use Share > Add to Home Screen (see the Help Guide).
+  // 2a. Samsung Internet builds its own installable wrapper using an outdated Android setting, which
+  //     Google Play Protect blocks ("Unsafe app blocked"). Nothing in the manifest can change that, so
+  //     Samsung Internet users get a button that reopens this page in Chrome, where installing works.
+  if(isSamsungBrowser && !isStandalone){
+    whenReady(function(){
+      addSidebarButton('btnInstallChrome', '<i class="fa-brands fa-chrome"></i>&nbsp; Install: open in Chrome', function(){
+        var loc = window.location;
+        loc.href = 'intent://' + loc.host + loc.pathname + loc.search +
+          '#Intent;scheme=https;package=com.android.chrome;S.browser_fallback_url=' +
+          encodeURIComponent(loc.href.split('#')[0]) + ';end';
+      });
+    });
+  }
+
+  // 2b. "Install app" button (Chrome on Android, and Chrome/Edge on a computer).
+  //     iPhones have no install prompt: people use Share > Add to Home Screen (see the Help Guide).
   var deferredPrompt = null, installBtn = null;
   function showInstallButton(){
-    var anchor = document.getElementById('btnSignOut');
-    if(!anchor || !anchor.parentNode) return;
     if(!installBtn){
-      installBtn = document.createElement('button');
-      installBtn.type = 'button';
-      installBtn.id = 'btnInstallApp';
-      installBtn.className = 'btn-signout';
-      installBtn.style.marginBottom = '8px';
-      installBtn.innerHTML = '<i class="fa-solid fa-download"></i>&nbsp; Install app';
-      installBtn.addEventListener('click', function(){
+      installBtn = addSidebarButton('btnInstallApp', '<i class="fa-solid fa-download"></i>&nbsp; Install app', function(){
         if(!deferredPrompt) return;
         var p = deferredPrompt; deferredPrompt = null;
         installBtn.style.display = 'none';
         p.prompt();
       });
-      anchor.parentNode.insertBefore(installBtn, anchor);
+      if(!installBtn) return;
     }
     installBtn.style.display = 'block';
   }
   window.addEventListener('beforeinstallprompt', function(e){
     e.preventDefault();
+    if(isSamsungBrowser) return; // see 2a: Samsung Internet's installer is the one that gets blocked
     deferredPrompt = e;
     whenReady(showInstallButton);
   });
