@@ -401,6 +401,10 @@ function renderFacilitiesList(){
 // key and reuse the spelling already on record.
 function normDistrict(v){ return (v || '').trim().toLowerCase(); }
 function districtChoices(){
+  // The official list (the "districts" table). Falls back to the districts already typed on
+  // facilities only if that list could not be loaded.
+  const official = (STATE.districts || []).filter(d => !STATE.profile.regionId || d.regionId === STATE.profile.regionId);
+  if(official.length) return official.map(d => d.name).sort((a, b) => a.localeCompare(b));
   const seen = {};
   STATE.facilities.forEach(f => { const k = normDistrict(f.district); if(k && !seen[k]) seen[k] = f.district.trim(); });
   return Object.keys(seen).map(k => seen[k]).sort((a, b) => a.localeCompare(b));
@@ -429,7 +433,7 @@ function openFacilityForm(existing){
       <div class="form-field" id="ff_type_other_wrap" style="${initialSelect==='Others'?'':'display:none;'}">
         <label>Specify Type *</label><input type="text" id="ff_type_other" value="${esc(initialOtherText)}" placeholder="e.g. Diagnostic Centre">
       </div>
-      <div class="form-field"><label>District *</label><input type="text" id="ff_district" list="ff_district_list" autocomplete="off" placeholder="Pick one, or type a new district" value="${esc(f.district||'')}"><datalist id="ff_district_list">${districtChoices().map(d => `<option value="${esc(d)}"></option>`).join('')}</datalist></div>
+      <div class="form-field"><label>District *</label><select id="ff_district"><option value="">— select district —</option>${districtChoices().map(d => `<option value="${esc(d)}" ${normDistrict(d)===normDistrict(f.district)?'selected':''}>${esc(d)}</option>`).join('')}</select></div>
       <div class="form-field span2"><label>Address</label><input type="text" id="ff_address" value="${esc(f.address||'')}"></div>
       <div class="form-field span2"><label>Contact</label><input type="text" id="ff_contact" value="${esc(f.contact||'')}"></div>
     </div>
@@ -1862,7 +1866,7 @@ function renderHelpBody(myRole){
     const faqs = [
       { q:'Google Play Protect says "Unsafe app blocked" when I install. Is the platform unsafe?', a:'No. Some browsers, mainly Samsung Internet, build the installed app using an outdated Android wrapper, and Play Protect blocks that wrapper. The platform itself is not the problem. Open the platform in Chrome and install it from there, or simply keep using it in your browser, because nothing is lost either way. If you still want to proceed, tap More details, then Install anyway.' },
       { q:'How do I install this on my phone?', a:'Open the platform in your phone browser and sign in. On Android, use the Chrome browser: tap "Install app" at the bottom of the sidebar, or open the browser menu (three dots) and choose Install app. (If you use Samsung Internet, the sidebar shows an "Install: open in Chrome" button instead.) On iPhone (Safari), tap the Share button and choose Add to Home Screen. It then opens full-screen from its own icon like any other app, and shows live data whenever your phone has internet. It updates itself each time you open it online, so there is nothing to download again. On iPhone you will need to sign in once more the first time you open the installed app.' },
-      { q:'How do Districts work?', a:'Every facility has a District, chosen when the facility is added. A District Director sees only the facilities in their district. Districts are matched by spelling, so "Tarkwa Nsuaem" and "Tarkwa-Nsuaem" count as different districts — pick from the suggestions when adding a facility rather than typing a new spelling.' },
+      { q:'How do Districts work?', a:'Every facility belongs to one of the 14 official districts of the Western Region, picked from a list when the facility is added or edited. A District Director sees only the facilities in their district. Because the list is fixed, districts cannot be misspelled or invented.' },
       { q:'Is the Equipment Code required?', a:'No, it is optional. If you do give a code, it must be unique within your facility. Equipment with no code can still be added, edited and scanned by QR code — but an Excel import cannot match it to an existing record, so importing the same file twice would add those rows twice.' },
       { q:'I just signed up and can\'t do anything — is that a bug?', a:'No — every new account starts as a read-only Viewer with no facility assigned, on purpose. Ask your Regional or Facility Administrator to assign your role and facility in the Users section, and you\'ll get access right away.' },
       { q:'I forgot my password — what do I do?', a:'Password resets aren\'t self-service yet. Contact your Regional or Facility Administrator and they can reset it for you directly, no email required.' },
