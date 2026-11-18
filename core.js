@@ -56,6 +56,7 @@ var STATE = {
   regions: [],
   facilities: [],
   categories: [],
+  districts: [],
   equipment: [],
   maintenance: [],
   calibration: [],
@@ -436,9 +437,10 @@ async function loadAllData(){
     sb.from('transfers').select('*').order('created_at', {ascending:false}),
     sb.from('documents').select('*').order('created_at', {ascending:false}),
     sb.from('users').select('*').order('name'),
-    sb.from('region_settings').select('*')
+    sb.from('region_settings').select('*'),
+    sb.from('districts').select('*').order('name')
   ]);
-  results.forEach(function(r){ if(r.error) throw r.error; });
+  results.slice(0, 10).forEach(function(r){ if(r.error) throw r.error; }); // the district list (11th) is handled separately below
   STATE.regions = results[0].data.map(function(r){ return { id:r.id, name:r.name }; });
   STATE.facilities = results[1].data.map(mapFacility);
   STATE.categories = results[2].data;
@@ -449,6 +451,9 @@ async function loadAllData(){
   STATE.documents = results[7].data.map(mapDocument);
   STATE.users = results[8].data.map(mapUser);
   STATE.regionSettings = results[9].data.map(mapRegionSettings);
+  // The official district list. If it cannot be read, the forms fall back to the districts already on
+  // facilities instead of stopping the whole app.
+  STATE.districts = results[10].error ? [] : results[10].data.map(function(d){ return { id:d.id, regionId:d.region_id, name:d.name }; });
   STATE.loaded = true;
 }
 APP.loadAllData = loadAllData;
