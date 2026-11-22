@@ -1665,7 +1665,7 @@ function renderUsers(){
       <td data-label="Phone" class="mono" style="font-size:12px;">${esc(dash(u.phone))}</td>
       <td data-label="Role"><span class="pill info">${esc(ROLE_LABELS[u.role]||u.role)}</span></td>
       <td data-label="Facility">${esc(u.facilityId ? facilityName(u.facilityId) : '—')}</td>
-      <td data-label="Signed up as" style="font-size:12px;">${esc([u.signupDistrict, u.signupFacilityType].filter(Boolean).join(' · ') || '—')}</td>
+      <td data-label="Signed up as" style="font-size:12px;">${esc([u.signupFacilityName, u.signupDistrict, u.signupFacilityType].filter(Boolean).join(' · ') || '—')}</td>
       <td data-label="Status"><span class="pill ${u.isActive ? 'ok':'neutral'}">${u.isActive?'Active':'Inactive'}</span></td>
       <td data-label="Action">${canManageUsers() ? `<button class="btn-secondary btn-sm edit-user" data-id="${u.id}">Edit</button>` : '—'}</td>
     </tr>`).join('');
@@ -1681,6 +1681,7 @@ function openUserForm(u){
     <div class="form-grid">
       <div class="form-field"><label>Name</label><input type="text" value="${esc(u.name)}" disabled></div>
       <div class="form-field"><label>Email</label><input type="text" value="${esc(u.email)}" disabled></div>
+      ${u.signupFacilityName ? `<div class="form-field span2"><label>Facility name entered at sign-up</label><input type="text" value="${esc(u.signupFacilityName)}" disabled></div>` : ''}
       ${(u.phone || u.signupDistrict || u.signupFacilityType) ? `<div class="form-field span2"><label>Sign-up details</label><input type="text" value="${esc([u.phone, u.signupDistrict, u.signupFacilityType].filter(Boolean).join(' · '))}" disabled></div>` : ''}
       ${selectField('uf_role','Role', assignableRoles, u.role, v => ROLE_LABELS[v]||v)}
       <div class="form-field" id="uf_facility_wrap"><label>Facility</label><select id="uf_facility"><option value="">— none —</option>${facilityOptions.map(f => `<option value="${f.id}" ${f.id===u.facilityId?'selected':''}>${esc(f.name)}</option>`).join('')}</select></div>
