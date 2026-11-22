@@ -182,7 +182,7 @@ function mapDocument(r){
   return { id:r.id, equipmentId:r.equipment_id, fileName:r.file_name, fileUrl:r.file_url, docType:r.doc_type, uploadedBy:r.uploaded_by, createdAt:r.created_at };
 }
 function mapUser(r){
-  return { id:r.id, name:r.name, email:r.email, role:r.role, facilityId:r.facility_id, regionId:r.region_id, district:r.district, phone:r.phone, signupDistrict:r.signup_district, signupFacilityType:r.signup_facility_type, isActive:r.is_active, createdAt:r.created_at };
+  return { id:r.id, name:r.name, email:r.email, role:r.role, facilityId:r.facility_id, regionId:r.region_id, district:r.district, phone:r.phone, signupDistrict:r.signup_district, signupFacilityType:r.signup_facility_type, signupFacilityName:r.signup_facility_name, isActive:r.is_active, createdAt:r.created_at };
 }
 function mapRegionSettings(r){
   return { regionId:r.region_id, bannerUrl:r.banner_url, updatedAt:r.updated_at, updatedBy:r.updated_by };
@@ -354,7 +354,8 @@ function signupExtraFieldsHtml(districtNames){
   function opts(list){ return list.map(function(x){ return '<option value="'+esc(x)+'">'+esc(x)+'</option>'; }).join(''); }
   return '<div class="form-field"><label>Telephone number (10 digits)</label><input type="tel" id="suPhone" inputmode="numeric" maxlength="10" autocomplete="tel" placeholder="e.g. 0200000000"></div>' +
     '<div class="form-field"><label>District</label><select id="suDistrict"><option value="">— select your district —</option>' + opts(districtNames) + '</select></div>' +
-    '<div class="form-field"><label>Facility type</label><select id="suFacilityType"><option value="">— select facility type —</option>' + opts(SIGNUP_FACILITY_TYPES) + '</select></div>';
+    '<div class="form-field"><label>Facility type</label><select id="suFacilityType"><option value="">— select facility type —</option>' + opts(SIGNUP_FACILITY_TYPES) + '</select></div>' +
+    '<div class="form-field"><label>Facility name</label><input type="text" id="suFacilityName" maxlength="120" autocomplete="organization" placeholder="Full name of your facility"></div>';
 }
 // Adds the three fields to the Create account form (between Email and Password), so index.html needs no change.
 function buildSignupExtraFields(){
@@ -366,6 +367,8 @@ function buildSignupExtraFields(){
   var phone = qs('suPhone');
   phone.addEventListener('input', function(){ var d = digitsOnly(this.value); if(d !== this.value) this.value = d; });
   phone.addEventListener('keydown', function(e){ if(e.key === 'Enter') doSignUp(); });
+  var fname = qs('suFacilityName');
+  if(fname) fname.addEventListener('keydown', function(e){ if(e.key === 'Enter') doSignUp(); });
   // Prefer the live list from the database (one source of truth); the built-in list is only the fallback.
   sb.from('districts').select('name').order('name').then(function(res){
     if(res.error || !res.data || !res.data.length) return;
@@ -380,15 +383,18 @@ async function doSignUp(){
   var name = qs('suName').value.trim(), email = qs('suEmail').value.trim(), password = qs('suPassword').value, confirmPassword = qs('suPasswordConfirm').value;
   var phoneEl = qs('suPhone'), districtEl = qs('suDistrict'), typeEl = qs('suFacilityType');
   var phone = phoneEl ? phoneEl.value.trim() : '', district = districtEl ? districtEl.value : '', facilityType = typeEl ? typeEl.value : '';
+  var nameEl = qs('suFacilityName');
+  var facilityName = nameEl ? nameEl.value.replace(/\s+/g, ' ').trim() : '';
   if(!name || !email || !password || !confirmPassword){ showAuthError('Fill in your name, email, and password (both fields).'); return; }
   if(phoneEl && !/^[0-9]{10}$/.test(phone)){ showAuthError('Telephone number must be exactly 10 digits (numbers only).'); return; }
   if(districtEl && !district){ showAuthError('Select your district.'); return; }
   if(typeEl && !facilityType){ showAuthError('Select your facility type.'); return; }
+  if(nameEl && facilityName.length < 3){ showAuthError('Enter the full name of your facility (at least 3 characters).'); return; }
   if(password.length < 8){ showAuthError('Password must be at least 8 characters.'); return; }
   if(password !== confirmPassword){ showAuthError('Those two passwords don\'t match — please re-check them.'); return; }
   var btn = qs('btnSignUp'); btn.disabled = true; btn.textContent = 'Creating account…';
   try{
-    var res = await sb.auth.signUp({ email: email, password: password, options: { data: { name: name, contact_phone: phone, signup_district: district, signup_facility_type: facilityType } } });
+    var res = await sb.auth.signUp({ email: email, password: password, options: { data: { name: name, contact_phone: phone, signup_district: district, signup_facility_type: facilityType, signup_facility_name: facilityName } } });
     if(res.error) throw res.error;
     if(res.data && res.data.session){
       // Email confirmation disabled on this project -> signed in immediately.
