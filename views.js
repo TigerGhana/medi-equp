@@ -1652,18 +1652,20 @@ function renderUsers(){
     <div class="section-head"><h2>User Accounts</h2><span class="hint">${rows.length} account(s) in your scope</span></div>
     <div class="role-note" style="margin-bottom:16px;"><i class="fa-solid fa-circle-info"></i>&nbsp; New users create their own account from the sign-in screen (starting as read-only Viewer). Assign their role and facility below to grant access.</div>
     <div class="table-shell"><div class="table-scroll">
-      <table><thead><tr><th class="no-sort">Name</th><th class="no-sort">Email</th><th class="no-sort">Role</th><th class="no-sort">Facility</th><th class="no-sort">Status</th><th class="no-sort">Action</th></tr></thead>
+      <table><thead><tr><th class="no-sort">Name</th><th class="no-sort">Email</th><th class="no-sort">Phone</th><th class="no-sort">Role</th><th class="no-sort">Facility</th><th class="no-sort">Signed up as</th><th class="no-sort">Status</th><th class="no-sort">Action</th></tr></thead>
       <tbody id="usersBody"></tbody></table>
     </div></div>
   `;
   const tbody = qs('usersBody');
-  if(rows.length === 0){ tbody.innerHTML = `<tr><td colspan="6"><div class="no-results">No users found.</div></td></tr>`; return; }
+  if(rows.length === 0){ tbody.innerHTML = `<tr><td colspan="8"><div class="no-results">No users found.</div></td></tr>`; return; }
   tbody.innerHTML = rows.map(u => `
     <tr>
       <td data-label="Name" class="name-cell">${esc(u.name)}</td>
       <td data-label="Email" class="mono" style="font-size:12px;">${esc(u.email)}</td>
+      <td data-label="Phone" class="mono" style="font-size:12px;">${esc(dash(u.phone))}</td>
       <td data-label="Role"><span class="pill info">${esc(ROLE_LABELS[u.role]||u.role)}</span></td>
       <td data-label="Facility">${esc(u.facilityId ? facilityName(u.facilityId) : '—')}</td>
+      <td data-label="Signed up as" style="font-size:12px;">${esc([u.signupDistrict, u.signupFacilityType].filter(Boolean).join(' · ') || '—')}</td>
       <td data-label="Status"><span class="pill ${u.isActive ? 'ok':'neutral'}">${u.isActive?'Active':'Inactive'}</span></td>
       <td data-label="Action">${canManageUsers() ? `<button class="btn-secondary btn-sm edit-user" data-id="${u.id}">Edit</button>` : '—'}</td>
     </tr>`).join('');
@@ -1679,6 +1681,7 @@ function openUserForm(u){
     <div class="form-grid">
       <div class="form-field"><label>Name</label><input type="text" value="${esc(u.name)}" disabled></div>
       <div class="form-field"><label>Email</label><input type="text" value="${esc(u.email)}" disabled></div>
+      ${(u.phone || u.signupDistrict || u.signupFacilityType) ? `<div class="form-field span2"><label>Sign-up details</label><input type="text" value="${esc([u.phone, u.signupDistrict, u.signupFacilityType].filter(Boolean).join(' · '))}" disabled></div>` : ''}
       ${selectField('uf_role','Role', assignableRoles, u.role, v => ROLE_LABELS[v]||v)}
       <div class="form-field" id="uf_facility_wrap"><label>Facility</label><select id="uf_facility"><option value="">— none —</option>${facilityOptions.map(f => `<option value="${f.id}" ${f.id===u.facilityId?'selected':''}>${esc(f.name)}</option>`).join('')}</select></div>
       <div class="form-field" id="uf_district_wrap" style="display:none;"><label>District *</label><select id="uf_district"><option value="">— select district —</option>${dChoices.map(d => `<option value="${esc(d)}" ${normDistrict(d)===normDistrict(u.district)?'selected':''}>${esc(d)}</option>`).join('')}</select></div>
